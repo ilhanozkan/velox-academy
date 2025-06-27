@@ -117,7 +117,7 @@ cd velox-academy
 
 4. **Start VM Service (for creating example SQL sandboxes images)**
    ```bash
-   cd vm-image
+   cd vm-image/.docker.dev
    docker-compose up -d
    ```
 
@@ -154,15 +154,16 @@ Create `.env` files in the respective directories:
 **Backend (`backend/app/.env`)**:
 
 ```env
-DATABASE_URL=postgresql://username:password@localhost:5432/velox
 JWT_SECRET=your-jwt-secret
-GOOGLE_APPLICATION_CREDENTIALS=path/to/credentials.json
 ```
 
 **Frontend (`frontend/app/.env.local`)**:
 
 ```env
-NEXT_PUBLIC_API_URL=http://localhost:5001
+NEXT_PUBLIC_BASE_URL=http://localhost:8080/api
+NEXT_PUBLIC_IMAGE_SERVER=http://localhost:8080/static
+# API URL for server-side requests (Docker container to container)
+NEXT_PUBLIC_API_URL=http://app:5001
 ```
 
 ### Google Cloud Setup
