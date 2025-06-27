@@ -1,0 +1,25 @@
+FROM node:18.20.6 AS builder
+ENV TZ=UTC
+WORKDIR /app
+
+# Install build dependencies
+RUN apt-get update && \
+    apt-get install -y \
+    python3 \
+    make \
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy package files first for better layer caching
+COPY package*.json ./
+
+# Install dependencies
+RUN npm install
+
+# Copy the rest of the application code
+COPY . .
+
+# Install nodemon
+RUN npm install -g nodemon
+
+CMD npm run dev

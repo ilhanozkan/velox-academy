@@ -1,0 +1,29 @@
+version: "3"
+services:
+  db:
+    image: postgres
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_DB: velox
+    networks:
+      - velox-network
+  app:
+    build: .
+    restart: always
+    ports:
+      - 8080:5001
+    networks:
+      - velox-network
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - ./application_default_credentials.json:/app/application_default_credentials.json
+    environment:
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/application_default_credentials.json
+    depends_on:
+      - db
+
+networks:
+  velox-network:
+    external: true

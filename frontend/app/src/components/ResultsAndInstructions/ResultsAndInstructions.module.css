@@ -1,0 +1,32 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.tabsList {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background-color: var(--mantine-color-secondary-9);
+}
+
+.tabsPanel {
+  overflow-y: auto;
+}
+
+.tab {
+  position: relative;
+  background-color: var(--mantine-color-secondary-9);
+  color: var(--mantine-color-white);
+
+  &:hover {
+    background-color: var(--mantine-color-brand-8);
+  }
+
+  &[data-active] {
+    z-index: 1;
+    background-color: var(--mantine-color-brand-1);
+    color: var(--mantine-color-white);
+  }
+}

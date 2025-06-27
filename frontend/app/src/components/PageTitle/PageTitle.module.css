@@ -1,0 +1,26 @@
+.header {
+  width: 100%;
+  height: 5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+
+  @media (max-width: $mantine-breakpoint-sm) {
+    flex-direction: column-reverse;
+  }
+}
+
+.title {
+  text-align: center;
+  flex: 1;
+  white-space: nowrap;
+}
+
+.empty {
+  flex: 1;
+}
+
+.children {
+  flex: 1;
+}

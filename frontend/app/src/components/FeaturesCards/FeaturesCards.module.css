@@ -1,0 +1,28 @@
+.title {
+  font-size: 34px;
+  font-weight: 900;
+
+  @media (max-width: $mantine-breakpoint-sm) {
+    font-size: 24px;
+  }
+}
+
+.cardDetails {
+  flex: 1;
+}
+
+.container {
+  background-color: var(--mantine-color-soft-0);
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.announcementItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
