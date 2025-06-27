@@ -1,0 +1,29 @@
+.tab {
+  position: relative;
+  background-color: var(--mantine-color-secondary-9);
+  color: var(--mantine-color-white);
+
+  @mixin hover {
+    background-color: var(--mantine-color-brand-8);
+  }
+
+  &[data-active] {
+    z-index: 1;
+    background-color: var(--mantine-color-brand-1);
+    color: var(--mantine-color-white);
+  }
+}
+
+.runButton {
+  position: absolute;
+  right: rem(16);
+  bottom: rem(20);
+  border-radius: rem(8);
+  background-color: var(--mantine-color-blue-9);
+  @mixin hover {
+    background-color: var(--mantine-color-blue-8);
+  }
+  &:hover {
+    @include hover;
+  }
+}

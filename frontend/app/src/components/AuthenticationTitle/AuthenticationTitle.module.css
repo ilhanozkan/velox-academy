@@ -1,0 +1,25 @@
+.container {
+  height: 100vh;
+  box-sizing: border-box;
+}
+
+.title {
+  font-family: Roboto, sans-serif;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--mantine-color-brandDark-6);
+  text-wrap: wrap;
+}
+
+.logo {
+  width: 16rem;
+}
+
+.logoContainer {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  padding-top: 2.5rem;
+}

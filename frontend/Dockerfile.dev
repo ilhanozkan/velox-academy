@@ -1,0 +1,9 @@
+FROM node:20.12.2-alpine AS builder
+ENV TZ=UTC
+WORKDIR /app
+
+COPY ./app/yarn.lock /app
+
+COPY ./app .
+
+CMD yarn install && yarn dev

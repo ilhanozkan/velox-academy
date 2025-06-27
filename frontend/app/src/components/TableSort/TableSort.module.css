@@ -1,0 +1,96 @@
+.table  {
+  border-radius: rem(8px);
+}
+
+.header {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  margin-top: rem(24.25px);
+
+  @media (max-width: $mantine-breakpoint-sm) {
+    flex-direction: column;
+  }
+}
+
+.tableHeader {
+  /* border-radius: rem(8px); */
+  border-top-left-radius: rem(8px);
+  border-top-right-radius: rem(8px);
+  background-color: var(--mantine-color-soft-0);
+
+  &:hover {
+    background-color: var(--mantine-color-soft-1);
+  }
+}
+
+.th {
+  padding: 0;
+
+  &:first-child {
+    border-top-left-radius: rem(8px);
+    /* border-bottom-left-radius: rem(8px); */
+  }
+
+  &:last-child {
+    border-top-right-radius: rem(8px);
+    /* border-bottom-right-radius: rem(8px); */
+  }
+}
+
+.tr,
+.tr > .td {
+  /* text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap; */
+
+  /* &:first-child {
+    border-top-left-radius: rem(8px);
+    border-bottom-left-radius: rem(8px);
+  }
+
+  &:last-child {
+    border-top-right-radius: rem(8px);
+    border-bottom-right-radius: rem(8px);
+  } */
+}
+
+.rowSelected {
+  background-color: var(--mantine-color-blue-light);
+}
+
+.tdClickable {
+  cursor: pointer;
+
+  /* p {
+    width: fit-content;
+    cursor: default;
+  } */
+}
+
+.control {
+  width: 100%;
+  padding: var(--mantine-spacing-xs) var(--mantine-spacing-md);
+}
+
+.icon {
+  width: rem(21px);
+  height: rem(21px);
+  border-radius: rem(21px);
+}
+
+.searchInput {
+  width: 100%;
+  margin-right: 1.25rem;
+}
+
+.createButton {
+  margin-bottom: 1rem;
+  min-width: fit-content;
+}
+
+.centerText {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

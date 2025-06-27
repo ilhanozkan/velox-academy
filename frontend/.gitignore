@@ -1,0 +1,10 @@
+# Node Modules
+app/node_modules
+
+# Build files
+.next
+
+# Logs
+app/public/.DS_Store
+app/src/.DS_Store
+app/.DS_Store

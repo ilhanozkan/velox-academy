@@ -1,0 +1,19 @@
+version: "3.8"
+
+services:
+  portal:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: velox-frontend
+    restart: always
+    ports:
+      - 3000:3000
+    volumes:
+      - ./app:/app
+    networks:
+      - velox-network
+
+networks:
+  velox-network:
+    external: true

@@ -1,0 +1,12 @@
+.filesContainer {
+  justify-content: center;
+  align-items: center;
+}
+
+.previewImage {
+  width: 100%;
+  height: auto;
+  border-radius: 0.5rem;
+  justify-content: center;
+  align-content: center;
+}

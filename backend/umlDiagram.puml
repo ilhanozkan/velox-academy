@@ -1,0 +1,164 @@
+' Frontend is a Category
+' "Learn React with creating Todo App" is a Training
+' "Learn React with creating Todo App" has 2 Chapters
+' "React Basics" is a Chapter, has 3 Instructions, has a Write-up, has a Sandbox
+' "React Basics" has 30 Instructions to complete
+' Chapters have Write-ups, Sandbox and Instructions
+
+@startuml Velox
+
+class Category << Entity >> {
+  + id
+  + name
+  + description
+  + trainings : Training[]
+  + createCategory()
+  + updateCategory()
+  + deleteCategory()
+  + getCategories()
+  + findCategoryById()
+}
+
+class Training << Entity >> {
+  + id: String
+  + name: String
+  + description: String
+  + category_id: String
+  + chapters : Chapter[]
+  + createTraining()
+  + updateTraining()
+  + deleteTraining()
+  + getTrainings()
+  + findTrainingById()
+  + completeTraining()
+}
+
+class Chapter << Entity >> {
+  + id: String
+  + name: String
+  + description: String
+  + training_id: String
+  + write_ups : WriteUp[]
+  + sandbox : Sandbox
+  + instructions : Instruction[]
+  + completeChapter()
+  + getWriteUps()
+  + getChapters()
+  + findChapterById()
+}
+
+class Instruction << Entity >> {
+  + id: String
+  + name: String
+  + description: String
+  + chapter_id: String
+  + sandbox : Sandbox
+  + achievement: Achievement
+  + completeInstruction()
+}
+
+class WriteUp << Entity >> {
+  + id: String
+  + file : File
+  + chapter_id: String
+  + downloadWriteUp()
+}
+
+class Achievement << Entity >> {
+  + id: String
+  + name: String
+  + description: String
+  + instruction_id: String
+  + user_id: String
+}
+
+class Sandbox << Entity >> {
+  + id: String
+  + name: String
+  + description: String
+  + image : Image
+  + chapter: Chapter
+  + initiateImage()
+  + stopImage()
+  + startSandbox()
+  + stopSandbox()
+}
+
+class Image << Entity >> {
+  + id: String
+  + name: String
+  + file: File
+  + uploadImage()
+  + deleteImage()
+}
+
+class File << Entity >> {
+  + id: String
+  + name: String
+  + path: String
+  + type: String
+}
+
+class User << Entity >> {
+  + id: String
+  + name: String
+  + email: String
+  + password: String
+  + status: String
+  + profileImage: String
+  + blocked: Boolean
+  + role: String
+  + achievements : Achievement[]
+  + enrollments : Enrollment[]
+  + earnAchievement()
+  + getAchievements()
+  + enrollTraining()
+  + completeTraining()
+  + startChapter()
+  + completeChapter()
+  + getInstruction()
+  + getWriteUp()
+  + uploadProfileImage()
+}
+
+class Admin << Entity >> {
+  + blockUser()
+  + unblockUser()
+  + createCategory()
+  + updateCategory()
+  + deleteCategory()
+  + createTraining()
+  + updateTraining()
+  + deleteTraining()
+  + createChapter()
+  + updateChapter()
+  + deleteChapter()
+  + createInstruction()
+  + updateInstruction()
+  + deleteInstruction()
+  + createWriteUp()
+  + updateWriteUp()
+  + deleteWriteUp()
+  + createAchievement()
+  + updateAchievement()
+  + deleteAchievement()
+  + createSandbox()
+  + updateSandbox()
+  + deleteSandbox()
+}
+
+Category o-- Training
+Training o-- Chapter
+
+Chapter o-- WriteUp
+Chapter o-- Sandbox
+Chapter *-- Instruction
+
+Admin --|> User
+
+Instruction *-- Achievement
+
+Sandbox o-- Image
+Image o-- File
+
+@enduml

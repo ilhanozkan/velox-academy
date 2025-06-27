@@ -1,0 +1,21 @@
+.fileNode {
+  cursor: pointer;
+  padding: 10px;
+  border-radius: 4px;
+}
+
+.fileNode:hover {
+  background-color: #090c1f;
+}
+
+.filesContainer {
+  white-space: nowrap;
+  background-color: #222544;
+  color: #fdfdfd;
+  font-family: Roboto, sans-serif;
+
+  li {
+    list-style: none;
+    line-height: 24px;
+  }
+}
