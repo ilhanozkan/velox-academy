@@ -1,7 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  reactStrictMode: false,
-  swcMinify: true,
+  reactStrictMode: true,
 
   // Redirects
   async redirects() {
@@ -9,7 +8,9 @@ const nextConfig = {
       {
         source: "/",
         destination: "/egitimler",
-        permanent: true,
+        // Not permanent: browsers cache 308s, which made "/" impossible to
+        // repurpose later.
+        permanent: false,
       },
     ];
   },

@@ -1,0 +1,6 @@
+.terminal {
+  height: 100%;
+  min-height: 16rem;
+  padding: 0.5rem;
+  background-color: #1e1e1e;
+}
