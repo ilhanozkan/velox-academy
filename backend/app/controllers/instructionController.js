@@ -1,89 +1,48 @@
 const InstructionService = require("../services/instructionService");
+const { notFound, pick, wrapController } = require("../utils/httpError");
 
 class InstructionController {
   static async getAllInstructions(req, res) {
-    try {
-      const instructions = await InstructionService.getAllInstructions();
-      res.status(200).json({ instructions });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: "Sunucu hatası" });
-    }
+    const instructions = await InstructionService.getAllInstructions();
+    res.status(200).json({ instructions });
   }
 
   static async getInstructionById(req, res) {
-    try {
-      const { id } = req.params;
-      const instruction = await InstructionService.getInstructionById(id);
-      if (!instruction) {
-        return res.status(404).json({ error: "Yönerge bulunamadı" });
-      }
-      res.status(200).json({ instruction });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: "Sunucu hatası" });
-    }
+    const instruction = await InstructionService.getInstructionById(req.params.id);
+    if (!instruction) throw notFound("Yönerge bulunamadı");
+    res.status(200).json({ instruction });
   }
 
   static async createInstruction(req, res) {
-    try {
-      const instructionData = req.body;
-      const newInstruction = await InstructionService.createInstruction(
-        instructionData
-      );
-      res
-        .status(201)
-        .json({ message: "Yönerge oluşturuldu", instruction: newInstruction });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: "Sunucu hatası" });
-    }
+    const instruction = await InstructionService.createInstruction(
+      pick(req.body, InstructionService.FIELDS)
+    );
+    res.status(201).json({ message: "Yönerge oluşturuldu", instruction });
   }
 
   static async updateInstruction(req, res) {
-    try {
-      const { id } = req.params;
-      const instructionData = req.body;
-      const updatedInstruction = await InstructionService.updateInstruction(
-        id,
-        instructionData
-      );
-      res.status(200).json({
-        message: "Yönerge güncellendi",
-        instruction: updatedInstruction,
-      });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: "Sunucu hatası" });
-    }
+    const instruction = await InstructionService.updateInstruction(
+      req.params.id,
+      pick(req.body, InstructionService.FIELDS)
+    );
+    res.status(200).json({ message: "Yönerge güncellendi", instruction });
   }
 
   static async deleteInstruction(req, res) {
-    try {
-      const { id } = req.params;
-      await InstructionService.deleteInstruction(id);
-      res.status(200).json({ message: "Yönerge silindi" });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: "Sunucu hatası" });
-    }
+    await InstructionService.deleteInstruction(req.params.id);
+    res.status(200).json({ message: "Yönerge silindi" });
   }
 
   // Business logic endpoints
   static async completeInstruction(req, res) {
-    try {
-      const { id } = req.params;
-      const { userId } = req.body;
-      const result = await InstructionService.completeInstruction(id, userId);
-      res.status(200).json({
-        message: "Yönerge tamamlandı",
-        completion: result,
-      });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: error.message });
-    }
+    const completion = await InstructionService.completeInstruction(req.params.id, req.user.userId);
+    res.status(200).json({ message: "Yönerge tamamlandı", completion });
+  }
+
+  static async uncompleteInstruction(req, res) {
+    const completion = await InstructionService.uncompleteInstruction(req.params.id, req.user.userId);
+    res.status(200).json({ message: "Yönerge tamamlanmadı olarak işaretlendi", completion });
   }
 }
 
-module.exports = InstructionController;
+module.exports = wrapController(InstructionController);

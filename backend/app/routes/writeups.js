@@ -1,25 +1,25 @@
 const express = require("express");
 const WriteUpController = require("../controllers/writeUpController");
-const authMiddleware = require("../utils/authMiddleware");
+const { requireAuth, requireAdmin } = require("../middleware/auth");
 const router = express.Router();
 
 // Tüm yazıları getir
-router.get("/", WriteUpController.getAllWriteUps);
+router.get("/", requireAuth, WriteUpController.getAllWriteUps);
 
 // Belirli bir yazıyı getir
-router.get("/:id", WriteUpController.getWriteUpById);
+router.get("/:id", requireAuth, WriteUpController.getWriteUpById);
 
 // Yeni yazı oluştur
-router.post("/", authMiddleware, WriteUpController.createWriteUp);
+router.post("/", requireAdmin, WriteUpController.createWriteUp);
 
 // Yazıyı güncelle
-router.put("/:id", authMiddleware, WriteUpController.updateWriteUp);
+router.put("/:id", requireAdmin, WriteUpController.updateWriteUp);
 
 // Yazıyı sil
-router.delete("/:id", authMiddleware, WriteUpController.deleteWriteUp);
+router.delete("/:id", requireAdmin, WriteUpController.deleteWriteUp);
 
 // Business logic routes
 // Yazıyı indir
-router.get("/:id/download", authMiddleware, WriteUpController.downloadWriteUp);
+router.get("/:id/download", requireAuth, WriteUpController.downloadWriteUp);
 
 module.exports = router;

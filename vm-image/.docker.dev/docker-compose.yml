@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   velox-vm-image:
     build:
@@ -14,6 +12,8 @@ services:
       - MYSQL_USER=root
       - MYSQL_PASSWORD=12345678
       - MYSQL_DATABASE=w3schools
+      # Must match LOCAL_SANDBOX_TOKEN of the API; empty disables the check.
+      - SANDBOX_TOKEN=${SANDBOX_TOKEN:-}
     depends_on:
       - mysql
 

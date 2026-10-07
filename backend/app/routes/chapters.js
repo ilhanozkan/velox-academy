@@ -1,6 +1,6 @@
 const express = require("express");
 const ChapterController = require("../controllers/chapterController");
-const authMiddleware = require("../utils/authMiddleware");
+const { requireAuth, requireAdmin } = require("../middleware/auth");
 const router = express.Router();
 
 // Tüm bölümleri getir
@@ -10,17 +10,17 @@ router.get("/", ChapterController.getAllChapters);
 router.get("/:id", ChapterController.getChapterById);
 
 // Yeni bölüm oluştur
-router.post("/", authMiddleware, ChapterController.createChapter);
+router.post("/", requireAdmin, ChapterController.createChapter);
 
 // Bölümü güncelle
-router.put("/:id", authMiddleware, ChapterController.updateChapter);
+router.put("/:id", requireAdmin, ChapterController.updateChapter);
 
 // Bölümü sil
-router.delete("/:id", authMiddleware, ChapterController.deleteChapter);
+router.delete("/:id", requireAdmin, ChapterController.deleteChapter);
 
 // Business logic routes
 // Bölümü tamamla
-router.post("/:id/complete", authMiddleware, ChapterController.completeChapter);
+router.post("/:id/complete", requireAuth, ChapterController.completeChapter);
 
 // Bölüme ait yazıları getir
 router.get("/:id/writeups", ChapterController.getWriteUps);
@@ -29,19 +29,12 @@ router.get("/:id/writeups", ChapterController.getWriteUps);
 router.get("/:id/instructions", ChapterController.getInstructions);
 
 // Bölümde belirli bir yönergeyi bul
-router.get(
-  "/:id/instructions/:instructionId",
-  ChapterController.findInstruction
-);
+router.get("/:id/instructions/:instructionId", ChapterController.findInstruction);
 
 // Bölüm sandbox'ını başlat
-router.post(
-  "/:id/sandbox/start",
-  authMiddleware,
-  ChapterController.startSandbox
-);
+router.post("/:id/sandbox/start", requireAuth, ChapterController.startSandbox);
 
 // Bölüm sandbox'ını durdur
-router.post("/:id/sandbox/stop", authMiddleware, ChapterController.stopSandbox);
+router.post("/:id/sandbox/stop", requireAuth, ChapterController.stopSandbox);
 
 module.exports = router;

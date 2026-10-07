@@ -1,45 +1,63 @@
-const multer = require("multer");
-const path = require("path");
+const crypto = require("crypto");
 const fs = require("fs");
+const path = require("path");
+const multer = require("multer");
 
-// Configure multer for file uploads
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadPath = path.join(__dirname, "../images");
-    // Create directory if it doesn't exist
-    if (!fs.existsSync(uploadPath)) {
-      fs.mkdirSync(uploadPath, { recursive: true });
-    }
-    cb(null, uploadPath);
-  },
-  filename: (req, file, cb) => {
-    // Generate unique filename with timestamp
-    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    cb(null, uniqueSuffix + path.extname(file.originalname));
-  },
-});
+const config = require("../config/env");
+const { badRequest, notFound, wrapController } = require("../utils/httpError");
 
-// File filter to only allow images
-const fileFilter = (req, file, cb) => {
-  const allowedTypes = /jpeg|jpg|png|gif|webp/;
-  const extname = allowedTypes.test(
-    path.extname(file.originalname).toLowerCase()
-  );
-  const mimetype = allowedTypes.test(file.mimetype);
+const IMAGES_DIR = config.uploads.imagesDir;
+const IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png", ".gif", ".webp"];
+const IMAGE_MIME_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
 
-  if (mimetype && extname) {
-    return cb(null, true);
-  } else {
-    cb(new Error("Only image files are allowed!"), false);
-  }
+/** Multer instance that stores validated images in IMAGES_DIR/<subdir>. */
+const imageUpload = (subdir = "") =>
+  multer({
+    storage: multer.diskStorage({
+      destination: (req, file, cb) => {
+        const uploadPath = path.join(IMAGES_DIR, subdir);
+        fs.mkdirSync(uploadPath, { recursive: true });
+        cb(null, uploadPath);
+      },
+      // Random names: never reuse anything from the client-supplied name
+      // except a whitelisted extension.
+      filename: (req, file, cb) => {
+        cb(null, `${Date.now()}-${crypto.randomUUID()}${path.extname(file.originalname).toLowerCase()}`);
+      },
+    }),
+    limits: { fileSize: config.uploads.maxImageBytes, files: 10 },
+    fileFilter: (req, file, cb) => {
+      const extension = path.extname(file.originalname).toLowerCase();
+
+      if (IMAGE_EXTENSIONS.includes(extension) && IMAGE_MIME_TYPES.includes(file.mimetype))
+        return cb(null, true);
+      cb(badRequest("Yalnızca .jpg, .jpeg, .png, .gif ve .webp görseller yüklenebilir"));
+    },
+  });
+
+const upload = imageUpload();
+
+/**
+ * Resolves a file name inside IMAGES_DIR. Rejects anything that would escape
+ * the directory: the old handlers joined the raw parameter, so
+ * DELETE /api/static-images/..%2Fmain.js deleted application files.
+ */
+const resolveImagePath = (filename) => {
+  const name = path.basename(String(filename || ""));
+  const filePath = path.join(IMAGES_DIR, name);
+
+  if (!name || name !== filename || !IMAGE_EXTENSIONS.includes(path.extname(name).toLowerCase()))
+    throw badRequest("Geçersiz dosya adı");
+  return filePath;
 };
 
-const upload = multer({
-  storage,
-  limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB limit
-  },
-  fileFilter,
+const describe = (filename, stats) => ({
+  filename,
+  url: `/static/images/${filename}`,
+  size: stats.size,
+  extension: path.extname(filename).toLowerCase(),
+  createdAt: stats.birthtime,
+  modifiedAt: stats.mtime,
 });
 
 class StaticImageController {
@@ -55,132 +73,70 @@ class StaticImageController {
 
   // Upload single image
   static uploadSingle(req, res) {
-    try {
-      if (!req.file) {
-        return res.status(400).json({ error: "No image file uploaded" });
-      }
+    if (!req.file) throw badRequest("Görsel dosyası yüklenmedi");
 
-      const imageUrl = `/static/images/${req.file.filename}`;
-
-      res.status(200).json({
-        message: "Image uploaded successfully",
-        filename: req.file.filename,
-        originalName: req.file.originalname,
-        url: imageUrl,
-        size: req.file.size,
-      });
-    } catch (error) {
-      console.error("Upload error:", error);
-      res.status(500).json({ error: "Failed to upload image" });
-    }
+    res.status(200).json({
+      message: "Image uploaded successfully",
+      filename: req.file.filename,
+      originalName: req.file.originalname,
+      url: `/static/images/${req.file.filename}`,
+      path: `images/${req.file.filename}`,
+      size: req.file.size,
+    });
   }
 
   // Upload multiple images
   static uploadMultiple(req, res) {
-    try {
-      if (!req.files || req.files.length === 0) {
-        return res.status(400).json({ error: "No image files uploaded" });
-      }
+    if (!req.files?.length) throw badRequest("Görsel dosyası yüklenmedi");
 
-      const uploadedFiles = req.files.map((file) => ({
+    res.status(200).json({
+      message: "Images uploaded successfully",
+      files: req.files.map((file) => ({
         filename: file.filename,
         originalName: file.originalname,
         url: `/static/images/${file.filename}`,
+        path: `images/${file.filename}`,
         size: file.size,
-      }));
-
-      res.status(200).json({
-        message: "Images uploaded successfully",
-        files: uploadedFiles,
-      });
-    } catch (error) {
-      console.error("Upload error:", error);
-      res.status(500).json({ error: "Failed to upload images" });
-    }
+      })),
+    });
   }
 
   // Get list of all static images
   static listImages(req, res) {
-    try {
-      const imagesPath = path.join(__dirname, "../images");
+    if (!fs.existsSync(IMAGES_DIR)) return res.status(200).json({ images: [] });
 
-      if (!fs.existsSync(imagesPath)) {
-        return res.status(200).json({ images: [] });
-      }
+    const images = fs
+      .readdirSync(IMAGES_DIR, { withFileTypes: true })
+      .filter((entry) => entry.isFile())
+      .map((entry) => entry.name)
+      .filter((file) => IMAGE_EXTENSIONS.includes(path.extname(file).toLowerCase()))
+      .map((file) => describe(file, fs.statSync(path.join(IMAGES_DIR, file))));
 
-      const files = fs.readdirSync(imagesPath);
-      const imageFiles = files.filter((file) => {
-        const ext = path.extname(file).toLowerCase();
-        return [".jpg", ".jpeg", ".png", ".gif", ".webp"].includes(ext);
-      });
-
-      const images = imageFiles.map((file) => {
-        const filePath = path.join(imagesPath, file);
-        const stats = fs.statSync(filePath);
-
-        return {
-          filename: file,
-          url: `/static/images/${file}`,
-          size: stats.size,
-          createdAt: stats.birthtime,
-          modifiedAt: stats.mtime,
-        };
-      });
-
-      res.status(200).json({ images });
-    } catch (error) {
-      console.error("List images error:", error);
-      res.status(500).json({ error: "Failed to list images" });
-    }
+    res.status(200).json({ images });
   }
 
   // Delete static image
   static deleteImage(req, res) {
-    try {
-      const { filename } = req.params;
-      const filePath = path.join(__dirname, "../images", filename);
+    const filePath = resolveImagePath(req.params.filename);
+    if (!fs.existsSync(filePath)) throw notFound("Görsel bulunamadı");
 
-      if (!fs.existsSync(filePath)) {
-        return res.status(404).json({ error: "Image not found" });
-      }
-
-      fs.unlinkSync(filePath);
-      res.status(200).json({
-        message: "Image deleted successfully",
-        filename: filename,
-      });
-    } catch (error) {
-      console.error("Delete error:", error);
-      res.status(500).json({ error: "Failed to delete image" });
-    }
+    fs.unlinkSync(filePath);
+    res.status(200).json({ message: "Image deleted successfully", filename: req.params.filename });
   }
 
   // Get image info
   static getImageInfo(req, res) {
-    try {
-      const { filename } = req.params;
-      const filePath = path.join(__dirname, "../images", filename);
+    const filePath = resolveImagePath(req.params.filename);
+    if (!fs.existsSync(filePath)) throw notFound("Görsel bulunamadı");
 
-      if (!fs.existsSync(filePath)) {
-        return res.status(404).json({ error: "Image not found" });
-      }
-
-      const stats = fs.statSync(filePath);
-      const ext = path.extname(filename).toLowerCase();
-
-      res.status(200).json({
-        filename: filename,
-        url: `/static/images/${filename}`,
-        size: stats.size,
-        extension: ext,
-        createdAt: stats.birthtime,
-        modifiedAt: stats.mtime,
-      });
-    } catch (error) {
-      console.error("Get image info error:", error);
-      res.status(500).json({ error: "Failed to get image info" });
-    }
+    res.status(200).json(describe(req.params.filename, fs.statSync(filePath)));
   }
 }
 
-module.exports = StaticImageController;
+const wrapped = wrapController(StaticImageController);
+// Middleware factories are called at route definition time, not per request.
+wrapped.getUploadMiddleware = StaticImageController.getUploadMiddleware;
+wrapped.getUploadMultipleMiddleware = StaticImageController.getUploadMultipleMiddleware;
+wrapped.imageUpload = imageUpload;
+
+module.exports = wrapped;

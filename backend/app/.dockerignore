@@ -1,0 +1,4 @@
+node_modules
+.env
+npm-debug.log
+application_default_credentials.json

@@ -1,5 +1,7 @@
+const db = require("../config/db");
 const User = require("../models/User");
 const Enrollment = require("../models/Enrollment");
+const { notFound, conflict } = require("../utils/httpError");
 const CategoryService = require("./categoryService");
 const TrainingService = require("./trainingService");
 const ChapterService = require("./chapterService");
@@ -8,34 +10,65 @@ const WriteUpService = require("./writeUpService");
 const AchievementService = require("./achievementService");
 const SandboxService = require("./sandboxService");
 
+const count = async (query) => Number((await query.count("* as count").first()).count);
+
 class AdminService {
   // User management methods
-  static async blockUser(userId) {
-    const updatedUser = await User.query().patchAndFetchById(userId, {
-      blocked: true,
-      status: "blocked",
-    });
+  static async listUsers() {
+    const users = await User.query().orderBy("id");
 
-    return {
-      userId,
-      blocked: true,
-      blockedAt: new Date(),
-      user: updatedUser,
-    };
+    const enrollmentCounts = Object.fromEntries(
+      (
+        await db("enrollments")
+          .select("user_id")
+          .count("* as total")
+          .count({ completed: db.raw("case when completed then 1 end") })
+          .groupBy("user_id")
+      ).map((row) => [row.user_id, row])
+    );
+    const achievementCounts = Object.fromEntries(
+      (
+        await db("user_achievements").select("user_id").count("* as total").groupBy("user_id")
+      ).map((row) => [row.user_id, Number(row.total)])
+    );
+
+    return users.map((user) => ({
+      ...user.toJSON(),
+      enrollmentCount: Number(enrollmentCounts[user.id]?.total || 0),
+      completedTrainingCount: Number(enrollmentCounts[user.id]?.completed || 0),
+      achievementCount: achievementCounts[user.id] || 0,
+    }));
   }
 
-  static async unblockUser(userId) {
-    const updatedUser = await User.query().patchAndFetchById(userId, {
-      blocked: false,
-      status: "active",
-    });
+  static async setStatus(actor, userId, status) {
+    if (Number(userId) === actor.id)
+      throw conflict("Kendi hesabınızın durumunu değiştiremezsiniz");
 
-    return {
-      userId,
-      blocked: false,
-      unblockedAt: new Date(),
-      user: updatedUser,
-    };
+    const user = await User.query().patchAndFetchById(userId, {
+      status,
+      blocked_at: status === "blocked" ? new Date().toISOString() : null,
+    });
+    if (!user) throw notFound("Kullanıcı bulunamadı");
+    return user;
+  }
+
+  static async blockUser(actor, userId) {
+    const user = await this.setStatus(actor, userId, "blocked");
+    return { userId: user.id, blocked: true, blockedAt: user.blocked_at, user };
+  }
+
+  static async unblockUser(actor, userId) {
+    const user = await this.setStatus(actor, userId, "active");
+    return { userId: user.id, blocked: false, unblockedAt: new Date(), user };
+  }
+
+  static async setRole(actor, userId, role) {
+    if (Number(userId) === actor.id)
+      throw conflict("Kendi rolünüzü değiştiremezsiniz");
+
+    const user = await User.query().patchAndFetchById(userId, { role });
+    if (!user) throw notFound("Kullanıcı bulunamadı");
+    return user;
   }
 
   // Category management methods
@@ -131,41 +164,56 @@ class AdminService {
 
   // Dashboard and analytics methods
   static async getDashboardStats() {
-    // In a real implementation, this would gather various statistics
-    const totalEnrollments = await Enrollment.query().count();
-    const completedEnrollments = await Enrollment.query()
-      .where("completed", true)
-      .count();
+    const totalEnrollments = await count(db("enrollments"));
+    const completedEnrollments = await count(db("enrollments").where("completed", true));
+
+    const popularTrainings = await db("trainings as t")
+      .leftJoin("enrollments as e", "e.training_id", "t.id")
+      .select("t.id", "t.name")
+      .count("e.id as enrollments")
+      .count({ completed: db.raw("case when e.completed then 1 end") })
+      .groupBy("t.id", "t.name")
+      .orderBy([{ column: "enrollments", order: "desc" }, { column: "t.name" }])
+      .limit(5);
+
+    const recentEnrollments = await Enrollment.query()
+      .withGraphFetched("[user, training]")
+      .orderBy("created_at", "desc")
+      .limit(8);
 
     return {
-      totalUsers: await User.query().count(),
-      activeUsers: await User.query().where("status", "active").count(),
-      blockedUsers: await User.query().where("blocked", true).count(),
-      totalCategories: await CategoryService.getAllCategories().then(
-        (categories) => categories.length
-      ),
-      totalTrainings: await TrainingService.getAllTrainings().then(
-        (trainings) => trainings.length
-      ),
-      totalChapters: await ChapterService.getAllChapters().then(
-        (chapters) => chapters.length
-      ),
-      totalEnrollments: totalEnrollments[0].count,
-      completedEnrollments: completedEnrollments[0].count,
+      totalUsers: await count(db("users")),
+      activeUsers: await count(db("users").where("status", "active")),
+      blockedUsers: await count(db("users").where("status", "blocked")),
+      adminUsers: await count(db("users").where("role", "admin")),
+      totalCategories: await count(db("categories")),
+      totalTrainings: await count(db("trainings")),
+      totalChapters: await count(db("chapters")),
+      totalInstructions: await count(db("instructions")),
+      totalEnrollments,
+      completedEnrollments,
       enrollmentCompletionRate:
-        totalEnrollments[0].count > 0
-          ? (
-              (completedEnrollments[0].count / totalEnrollments[0].count) *
-              100
-            ).toFixed(2)
+        totalEnrollments > 0
+          ? Number(((completedEnrollments / totalEnrollments) * 100).toFixed(2))
           : 0,
+      completedInstructions: await count(db("instruction_completions")),
+      achievementsEarned: await count(db("user_achievements")),
+      runningSandboxes: await count(db("user_sandboxes").where("vm_status", "running")),
+      popularTrainings: popularTrainings.map((t) => ({
+        ...t,
+        enrollments: Number(t.enrollments),
+        completed: Number(t.completed),
+      })),
+      recentEnrollments,
       generatedAt: new Date(),
     };
   }
 
   // Enrollment management methods
   static async getAllEnrollments() {
-    return await Enrollment.query().withGraphFetched("[user, training]");
+    return await Enrollment.query()
+      .withGraphFetched("[user, training]")
+      .orderBy("created_at", "desc");
   }
 
   static async getEnrollmentById(id) {
@@ -175,12 +223,10 @@ class AdminService {
   }
 
   static async deleteEnrollment(id) {
-    await Enrollment.query().deleteById(id);
-    return {
-      enrollmentId: id,
-      deletedAt: new Date(),
-      status: "deleted",
-    };
+    const deleted = await Enrollment.query().deleteById(id);
+    if (!deleted) throw notFound("Kayıt bulunamadı");
+
+    return { enrollmentId: Number(id), deletedAt: new Date(), status: "deleted" };
   }
 }
 

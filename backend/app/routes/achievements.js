@@ -1,21 +1,20 @@
 const express = require("express");
 const AchievementController = require("../controllers/achievementController");
-const authMiddleware = require("../utils/authMiddleware");
+const { requireAuth, requireAdmin } = require("../middleware/auth");
 const router = express.Router();
 
 // Tüm başarıları getir
-router.get("/", AchievementController.getAllAchievements);
+router.get("/", requireAuth, AchievementController.getAllAchievements);
 
 // Belirli bir başarıyı getir
-router.get("/:id", AchievementController.getAchievementById);
+router.get("/:id", requireAuth, AchievementController.getAchievementById);
 
 // Yeni başarı oluştur
-router.post("/", authMiddleware, AchievementController.createAchievement);
+router.post("/", requireAdmin, AchievementController.createAchievement);
 
 // Başarıyı güncelle
-router.put("/:id", authMiddleware, AchievementController.updateAchievement);
+router.put("/:id", requireAdmin, AchievementController.updateAchievement);
 
 // Başarıyı sil
-router.delete("/:id", authMiddleware, AchievementController.deleteAchievement);
-
+router.delete("/:id", requireAdmin, AchievementController.deleteAchievement);
 module.exports = router;

@@ -1,114 +1,96 @@
+const crypto = require("crypto");
 const compute = require("@google-cloud/compute");
 
-const projectId = "primal-gear-461809-v7";
-const zone = "europe-west1-b";
-const templateName = "velox-images-sql-101";
-const instanceTemplateUrl = `https://compute.googleapis.com/compute/v1/projects/${projectId}/global/instanceTemplates/${templateName}`;
+const config = require("../config/env");
 
-async function createUserVM(userId, trainingId) {
-  const instanceName = `user-${userId}-training-${trainingId}-vm`;
-  const instancesClient = new compute.InstancesClient();
+// Instance metadata key the sandbox service (vm-image) reads its access token from.
+const TOKEN_METADATA_KEY = "velox-sandbox-token";
 
-  console.log(
-    `Creating VM ${instanceName} in ${zone} for user ${userId} training ${trainingId}...`
-  );
+// gRPC status codes used by the Compute client (REST fallback uses HTTP codes).
+const isNotFound = (error) => error?.code === 5 || error?.code === 404;
+const isAlreadyExists = (error) => error?.code === 6 || error?.code === 409;
 
-  try {
-    const [response] = await instancesClient.insert({
-      project: projectId,
-      zone,
-      instanceResource: {
-        name: instanceName,
-        labels: {
-          "user-id": userId.toString(),
-          "training-id": trainingId.toString(),
-          "vm-type": "training-sandbox",
-        },
-      },
-      sourceInstanceTemplate: instanceTemplateUrl,
-    });
+const gcp = () => config.sandbox.gcp;
 
-    let operation = response.latestResponse;
-    const operationsClient = new compute.ZoneOperationsClient();
+/**
+ * Compute Engine resource names must match [a-z]([-a-z0-9]*[a-z0-9])? and be
+ * at most 63 characters. Training ids are free-form, so normalise them and
+ * keep long names unique with a short hash suffix.
+ */
+const toResourceName = (value) => {
+  let name = String(value)
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^[^a-z]+/, "")
+    .replace(/-+$/, "");
 
-    while (operation.status !== "DONE") {
-      [operation] = await operationsClient.wait({
-        operation: operation.name,
-        project: projectId,
-        zone: operation.zone.split("/").pop(),
-      });
-    }
+  if (!name) name = "vm";
 
-    console.log(`VM ${instanceName} created successfully.`);
-
-    const externalIp = await getVmExternalIp(instanceName);
-
-    return {
-      instanceName,
-      externalIp,
-      zone,
-      projectId,
-      status: "running",
-    };
-  } catch (error) {
-    console.error(`Failed to create VM for user ${userId}:`, error);
-    throw new Error(`VM creation failed: ${error.message}`);
+  if (name.length > 63) {
+    const hash = crypto.createHash("sha1").update(String(value)).digest("hex").slice(0, 8);
+    name = `${name.slice(0, 54).replace(/-+$/, "")}-${hash}`;
   }
-}
+  return name;
+};
 
-async function createVM() {
-  const instanceName = "velox-images-sql-101";
-  const instancesClient = new compute.InstancesClient();
-  console.log(
-    `Creating the ${instanceName} instance in ${zone} from template ${instanceTemplateUrl}...`
-  );
+const toLabelValue = (value) =>
+  String(value).toLowerCase().replace(/[^a-z0-9_-]/g, "-").slice(0, 63);
 
-  const [response] = await instancesClient.insert({
-    project: projectId,
-    zone,
-    instanceResource: {
-      name: instanceName,
-    },
-    sourceInstanceTemplate: instanceTemplateUrl,
-  });
+const userInstanceName = (userId, trainingId) =>
+  toResourceName(`user-${userId}-training-${trainingId}-vm`);
+
+const templateUrl = (templateName) =>
+  `https://compute.googleapis.com/compute/v1/projects/${gcp().projectId}/global/instanceTemplates/${templateName}`;
+
+const waitForOperation = async (response) => {
   let operation = response.latestResponse;
   const operationsClient = new compute.ZoneOperationsClient();
 
   while (operation.status !== "DONE") {
     [operation] = await operationsClient.wait({
       operation: operation.name,
-      project: projectId,
+      project: gcp().projectId,
       zone: operation.zone.split("/").pop(),
     });
   }
 
-  console.log("Instance created.");
+  if (operation.error?.errors?.length) {
+    throw new Error(operation.error.errors.map((e) => e.message).join("; "));
+  }
+};
 
-  return getVmExternalIp(templateName);
-}
+// Metadata given at insert time replaces the template's metadata entirely, so
+// keep the template's items (e.g. its startup script) and add the token.
+const templateMetadataWithToken = async (templateName, accessToken) => {
+  const templatesClient = new compute.InstanceTemplatesClient();
+  const [template] = await templatesClient.get({
+    project: gcp().projectId,
+    instanceTemplate: templateName,
+  });
 
-const getVmExternalIp = async (instanceName = templateName) => {
-  const { InstancesClient } = require("@google-cloud/compute");
+  const items = (template.properties?.metadata?.items || []).filter(
+    (item) => item.key !== TOKEN_METADATA_KEY
+  );
+  return { items: [...items, { key: TOKEN_METADATA_KEY, value: accessToken }] };
+};
 
-  const computeClient = new InstancesClient();
+const getVmExternalIp = async (instanceName = gcp().instanceTemplate) => {
+  const computeClient = new compute.InstancesClient();
 
   try {
-    const the_compute_instance = await computeClient.get({
+    const [instance] = await computeClient.get({
       instance: instanceName,
-      project: projectId,
-      zone,
+      project: gcp().projectId,
+      zone: gcp().zone,
     });
 
-    const public_ip =
-      the_compute_instance[0]["networkInterfaces"][0]["accessConfigs"][0][
-        "natIP"
-      ];
+    const publicIp = instance.networkInterfaces?.[0]?.accessConfigs?.[0]?.natIP;
+    if (!publicIp) throw new Error("VM has no external IP address");
 
-    console.log(`VM ${instanceName} IP: http://${public_ip}`);
-
-    return public_ip;
+    return publicIp;
   } catch (error) {
-    console.error(`Failed to get IP for VM ${instanceName}:`, error);
+    console.error(`Failed to get IP for VM ${instanceName}:`, error.message);
     throw new Error(`Failed to get VM IP: ${error.message}`);
   }
 };
@@ -117,34 +99,105 @@ async function deleteUserVM(instanceName) {
   const instancesClient = new compute.InstancesClient();
 
   try {
-    console.log(`Deleting VM ${instanceName} in ${zone}...`);
-
+    console.log(`Deleting VM ${instanceName} in ${gcp().zone}...`);
     const [response] = await instancesClient.delete({
-      project: projectId,
-      zone,
+      project: gcp().projectId,
+      zone: gcp().zone,
       instance: instanceName,
     });
-
-    let operation = response.latestResponse;
-    const operationsClient = new compute.ZoneOperationsClient();
-
-    while (operation.status !== "DONE") {
-      [operation] = await operationsClient.wait({
-        operation: operation.name,
-        project: projectId,
-        zone: operation.zone.split("/").pop(),
-      });
-    }
-
+    await waitForOperation(response);
     console.log(`VM ${instanceName} deleted successfully.`);
-    return { status: "deleted", instanceName };
   } catch (error) {
-    console.error(`Failed to delete VM ${instanceName}:`, error);
+    // Already gone: nothing to clean up.
+    if (isNotFound(error)) return { status: "deleted", instanceName };
+
+    console.error(`Failed to delete VM ${instanceName}:`, error.message);
     throw new Error(`VM deletion failed: ${error.message}`);
   }
+
+  return { status: "deleted", instanceName };
 }
 
-module.exports.getVmExternalIp = getVmExternalIp;
-module.exports.createVM = createVM;
-module.exports.createUserVM = createUserVM;
-module.exports.deleteUserVM = deleteUserVM;
+/**
+ * Creates a sandbox VM from an instance template and returns its address.
+ * If a VM with the same name survived an earlier failed attempt it is
+ * replaced, because it would still hold the previous access token.
+ */
+async function createUserVM({ instanceName, templateName, accessToken, labels = {} }) {
+  const instancesClient = new compute.InstancesClient();
+  const template = templateName || gcp().instanceTemplate;
+
+  const insert = async () => {
+    const [response] = await instancesClient.insert({
+      project: gcp().projectId,
+      zone: gcp().zone,
+      instanceResource: {
+        name: instanceName,
+        labels: Object.fromEntries(
+          Object.entries({ ...labels, "vm-type": "training-sandbox" }).map(([k, v]) => [
+            k,
+            toLabelValue(v),
+          ])
+        ),
+        ...(accessToken && {
+          metadata: await templateMetadataWithToken(template, accessToken),
+        }),
+      },
+      sourceInstanceTemplate: templateUrl(template),
+    });
+    await waitForOperation(response);
+  };
+
+  console.log(`Creating VM ${instanceName} in ${gcp().zone} from template ${template}...`);
+
+  try {
+    await insert();
+  } catch (error) {
+    if (!isAlreadyExists(error)) {
+      console.error(`Failed to create VM ${instanceName}:`, error.message);
+      throw new Error(`VM creation failed: ${error.message}`);
+    }
+
+    console.warn(`VM ${instanceName} already exists, recreating it.`);
+    await deleteUserVM(instanceName);
+    await insert();
+  }
+
+  console.log(`VM ${instanceName} created successfully.`);
+
+  return {
+    instanceName,
+    externalIp: await getVmExternalIp(instanceName),
+    zone: gcp().zone,
+    projectId: gcp().projectId,
+  };
+}
+
+/** Creates the VM used to build the sandbox image (admin only). */
+async function createVM() {
+  const { instanceTemplate } = gcp();
+  const instancesClient = new compute.InstancesClient();
+
+  console.log(`Creating the ${instanceTemplate} instance in ${gcp().zone}...`);
+
+  const [response] = await instancesClient.insert({
+    project: gcp().projectId,
+    zone: gcp().zone,
+    instanceResource: { name: toResourceName(instanceTemplate) },
+    sourceInstanceTemplate: templateUrl(instanceTemplate),
+  });
+  await waitForOperation(response);
+
+  console.log("Instance created.");
+  return getVmExternalIp(toResourceName(instanceTemplate));
+}
+
+module.exports = {
+  TOKEN_METADATA_KEY,
+  toResourceName,
+  userInstanceName,
+  getVmExternalIp,
+  createVM,
+  createUserVM,
+  deleteUserVM,
+};
