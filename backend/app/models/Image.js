@@ -8,7 +8,7 @@ class Image extends BaseModel {
   static get jsonSchema() {
     return {
       type: "object",
-      required: ["id", "name", "file_path", "sandbox_id"],
+      required: ["id", "name", "file_path"],
       properties: {
         id: { type: "string", maxLength: 128 },
         name: { type: "string", minLength: 1, maxLength: 255 },
