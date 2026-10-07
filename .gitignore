@@ -1,3 +1,9 @@
 .DS_Store
 .vscode
 backend/app/application_default_credentials.json
+# Dependencies
+node_modules/
+
+# Logs
+npm-debug.log*
+yarn-error.log*

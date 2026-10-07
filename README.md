@@ -105,7 +105,7 @@ cd velox-academy
 
    ```bash
    cd backend/app
-   docker-compose up -d
+   docker compose up -d
    ```
 
 3. **Start Frontend**
@@ -118,14 +118,18 @@ cd velox-academy
 4. **Start VM Service (for creating example SQL sandboxes images)**
    ```bash
    cd vm-image/.docker.dev
-   docker-compose up -d
+   docker compose up -d
    ```
 
 ### Running Locally
 
-1. **Start PostgreSQL database**
+1. **Start PostgreSQL database** and point the API at it (see [docs/database.md](docs/database.md#configuration)):
 
-2. **Start Backend**
+   ```bash
+   export DB_HOST=localhost DB_NAME=velox DB_USER=postgres DB_PASSWORD=postgres
+   ```
+
+2. **Start Backend** (migrations and seeds run automatically on startup)
 
    ```bash
    cd backend/app
@@ -176,16 +180,30 @@ NEXT_PUBLIC_API_URL=http://app:5001
 
 ## 📊 Database Schema
 
-The platform uses a relational database with the following main entities:
+The platform uses PostgreSQL with the following main entities (full ER diagram,
+deletion rules and commands in [docs/database.md](docs/database.md)):
 
-- **Users**: User accounts and authentication
+- **Users**: Accounts with a `user` or `admin` role and an `active`/`blocked` status
 - **Categories**: Course categories (e.g., Cybersecurity, Web Dev)
-- **Trainings**: Individual courses within categories
-- **Chapters**: Course sections with content
-- **Instructions**: Step-by-step learning content
-- **Sandboxes**: Virtual environment configurations
-- **WriteUps**: Student submissions and documentation
-- **Achievements**: Progress tracking and badges
+- **Trainings**: Individual courses within categories, with level and duration
+- **Chapters**: Ordered course sections
+- **Instructions**: Ordered, markdown-based learning steps
+- **Sandboxes / User Sandboxes**: Sandbox configuration and each learner's VM
+- **WriteUps**: Chapter write-ups and their files
+- **Achievements**: Badges awarded for completing instructions
+- **Enrollments & progress**: Enrollments, completed instructions/chapters and earned achievements
+
+Migrations run when the API starts; you can also manage the database from `backend/app`:
+
+```bash
+npm run db:migrate    # apply pending migrations
+npm run db:seed       # demo catalog + admin user (idempotent)
+npm run db:status     # applied / pending migrations
+npm run db:reset      # rollback everything, migrate and seed
+```
+
+In development the seeded admin account is `contact.ilhanozkan@gmail.com` /
+`1234` (override with `ADMIN_EMAIL` / `ADMIN_PASSWORD`).
 
 ## 🔗 API Endpoints
 

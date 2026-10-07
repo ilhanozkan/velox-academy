@@ -1,11 +1,17 @@
-version: "3"
 services:
   db:
-    image: postgres
+    image: postgres:16
     environment:
       POSTGRES_PASSWORD: postgres
       POSTGRES_USER: postgres
       POSTGRES_DB: velox
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d velox"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     networks:
       - velox-network
   app:
@@ -21,8 +27,16 @@ services:
       - ./application_default_credentials.json:/app/application_default_credentials.json
     environment:
       - GOOGLE_APPLICATION_CREDENTIALS=/app/application_default_credentials.json
+      - DB_HOST=db
+      - DB_NAME=velox
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
 
 networks:
   velox-network:
