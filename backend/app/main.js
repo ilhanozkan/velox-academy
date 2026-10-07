@@ -7,9 +7,11 @@ const UserSandboxService = require("./services/userSandboxService");
 const start = async () => {
   await createTables();
 
-  const interrupted = await UserSandboxService.failInterruptedProvisioning();
-  if (interrupted)
-    console.warn(`${interrupted} yarım kalmış sandbox kurulumu hata olarak işaretlendi.`);
+  if (config.sandbox.reconcileOnStart) {
+    const interrupted = await UserSandboxService.failInterruptedProvisioning();
+    if (interrupted)
+      console.warn(`${interrupted} yarım kalmış sandbox kurulumu hata olarak işaretlendi.`);
+  }
 
   const server = app.listen(config.port, () => {
     console.log(

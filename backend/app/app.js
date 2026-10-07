@@ -41,6 +41,16 @@ app.use(
     credentials: true,
   })
 );
+// Defense in depth against cross-site requests (CSRF): browsers send an
+// Origin header with cross-site POST/PUT/DELETE requests, including form
+// posts that CORS does not block. SameSite=Lax cookies already stop these
+// unless COOKIE_SAMESITE is relaxed.
+const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+app.use((req, res, next) => {
+  const origin = req.get("origin");
+  if (SAFE_METHODS.has(req.method) || !origin || config.corsOrigins.includes(origin)) return next();
+  res.status(403).json({ error: "Bu kaynaktan gelen isteklere izin verilmiyor" });
+});
 app.use(cookieParser());
 app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true, limit: "1mb" }));

@@ -43,6 +43,9 @@ class UserSandboxController {
   // or inspect someone else's VM.
   static async recreateSandbox(req, res) {
     const owned = await UserSandboxService.findOwned(req.params.id, req.currentUser);
+    if (!(await TrainingService.isUserEnrolled(owned.training_id, owned.user_id)))
+      throw notFound("Bu eğitime kayıtlı değilsiniz");
+
     const sandbox = await UserSandboxService.ensureSandbox(owned.user_id, owned.training_id, {
       recreate: true,
     });

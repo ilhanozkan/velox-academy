@@ -81,10 +81,11 @@ class UserService {
 
     if (!(await user.verifyPassword(currentPassword)))
       throw unauthorized("Mevcut parolanız hatalı");
-    if (!newPassword) throw badRequest("Yeni parola zorunludur", { newPassword: "Yeni parola zorunludur" });
+    if (typeof newPassword !== "string" || !newPassword)
+      throw badRequest("Yeni parola zorunludur", { newPassword: "Yeni parola zorunludur" });
 
     // The model validates the length and hashes the new password.
-    await User.query().patchAndFetchById(userId, { password: newPassword });
+    return await User.query().patchAndFetchById(userId, { password: newPassword });
   }
 
   static async deleteUser(id) {

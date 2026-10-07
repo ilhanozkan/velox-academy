@@ -6,9 +6,18 @@ const config = require("../config/env");
 // Instance metadata key the sandbox service (vm-image) reads its access token from.
 const TOKEN_METADATA_KEY = "velox-sandbox-token";
 
-// gRPC status codes used by the Compute client (REST fallback uses HTTP codes).
-const isNotFound = (error) => error?.code === 5 || error?.code === 404;
-const isAlreadyExists = (error) => error?.code === 6 || error?.code === 409;
+// The Compute client uses the REST transport: google-gax maps HTTP 404 to gRPC
+// code 5 but HTTP 409 to 10 (ABORTED), and errors reported inside a finished
+// operation carry no code at all. Match on the message as well.
+const isNotFound = (error) =>
+  error?.code === 5 || error?.code === 404 || /was not found|\bnotFound\b/i.test(error?.message || "");
+const isAlreadyExists = (error) =>
+  error?.code === 6 ||
+  error?.code === 409 ||
+  /already exists|\balreadyExists\b/i.test(error?.message || "");
+
+// Upper bound for one Compute Engine operation (create/delete).
+const OPERATION_TIMEOUT_MS = 10 * 60 * 1000;
 
 const gcp = () => config.sandbox.gcp;
 
@@ -46,8 +55,10 @@ const templateUrl = (templateName) =>
 const waitForOperation = async (response) => {
   let operation = response.latestResponse;
   const operationsClient = new compute.ZoneOperationsClient();
+  const deadline = Date.now() + OPERATION_TIMEOUT_MS;
 
   while (operation.status !== "DONE") {
+    if (Date.now() > deadline) throw new Error(`Operation ${operation.name} timed out`);
     [operation] = await operationsClient.wait({
       operation: operation.name,
       project: gcp().projectId,

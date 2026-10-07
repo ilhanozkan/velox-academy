@@ -1,3 +1,4 @@
+const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
 
 const config = require("../config/env");
@@ -12,10 +13,17 @@ const cookieOptions = () => ({
   path: "/",
 });
 
+// Fingerprint of the stored password hash. Tokens carry it, so changing the
+// password ends every other session.
+const passwordVersion = (user) =>
+  crypto.createHash("sha256").update(String(user.password)).digest("hex").slice(0, 16);
+
 const signToken = (user) =>
-  jwt.sign({ userId: user.id, role: user.role }, config.auth.jwtSecret, {
-    expiresIn: config.auth.jwtExpiresIn,
-  });
+  jwt.sign(
+    { userId: user.id, role: user.role, pwv: passwordVersion(user) },
+    config.auth.jwtSecret,
+    { expiresIn: config.auth.jwtExpiresIn }
+  );
 
 const setAuthCookie = (res, token) =>
   res.cookie(config.auth.cookieName, token, {
@@ -47,7 +55,8 @@ const authenticate = async (req) => {
   // Load the account on every request so that blocking a user or changing
   // their role takes effect immediately rather than when the token expires.
   const user = await User.query().findById(payload.userId);
-  if (!user) throw unauthorized("Oturumunuzun süresi dolmuş, lütfen tekrar giriş yapın");
+  if (!user || payload.pwv !== passwordVersion(user))
+    throw unauthorized("Oturumunuzun süresi dolmuş, lütfen tekrar giriş yapın");
   if (user.isBlocked) throw forbidden("Hesabınız engellenmiş");
 
   return user;

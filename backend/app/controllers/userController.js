@@ -1,3 +1,5 @@
+const fs = require("fs/promises");
+
 const UserService = require("../services/userService");
 const { notFound, forbidden, conflict, pick, wrapController } = require("../utils/httpError");
 
@@ -87,8 +89,14 @@ class UserController {
   }
 
   static async uploadProfileImage(req, res) {
-    const upload = await UserService.uploadProfileImage(req.params.id, req.file);
-    res.status(200).json({ message: "Profil resmi yüklendi", upload });
+    try {
+      const upload = await UserService.uploadProfileImage(req.params.id, req.file);
+      res.status(200).json({ message: "Profil resmi yüklendi", upload });
+    } catch (error) {
+      // Multer already stored the file; do not keep it when the upload fails.
+      if (req.file) await fs.unlink(req.file.path).catch(() => {});
+      throw error;
+    }
   }
 
   static async removeProfileImage(req, res) {

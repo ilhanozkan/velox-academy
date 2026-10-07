@@ -23,13 +23,14 @@ const IGNORED_ENTRIES = new Set(["node_modules", ".git"]);
 // ---------------------------------------------------------------------------
 // The API creates a random token for every sandbox and passes it to the VM
 // through instance metadata; locally it comes from SANDBOX_TOKEN. Without a
-// token anyone who knows the VM's IP could open a terminal on it.
+// token anyone who knows the VM's IP could open a terminal on it, so the
+// service refuses every connection until it has one. Only ALLOW_NO_TOKEN=true
+// (local development) disables the check.
 const METADATA_URL =
   "http://metadata.google.internal/computeMetadata/v1/instance/attributes/velox-sandbox-token";
+const ALLOW_NO_TOKEN = process.env.ALLOW_NO_TOKEN === "true";
 
-const loadToken = async () => {
-  if (process.env.SANDBOX_TOKEN) return process.env.SANDBOX_TOKEN;
-
+const fetchMetadataToken = async () => {
   try {
     const response = await fetch(METADATA_URL, {
       headers: { "Metadata-Flavor": "Google" },
@@ -37,15 +38,34 @@ const loadToken = async () => {
     });
     if (response.ok) return (await response.text()).trim() || null;
   } catch {
-    // Not running on Compute Engine.
+    // Not on Compute Engine, or the metadata server is not reachable yet.
   }
   return null;
 };
 
-let accessToken = null;
+let accessToken = process.env.SANDBOX_TOKEN || null;
+let lastTokenLookup = 0;
+
+const loadToken = async ({ attempts = 1 } = {}) => {
+  for (let attempt = 1; !accessToken && attempt <= attempts; attempt++) {
+    lastTokenLookup = Date.now();
+    accessToken = await fetchMetadataToken();
+    if (!accessToken && attempt < attempts) await new Promise((r) => setTimeout(r, 2000));
+  }
+  return accessToken;
+};
+
+// Retry the metadata lookup lazily (at most every 10 s) while no token is known.
+const refreshTokenInBackground = () => {
+  if (accessToken || ALLOW_NO_TOKEN || Date.now() - lastTokenLookup < 10000) return;
+  loadToken().catch(() => {});
+};
 
 const tokenMatches = (candidate) => {
-  if (!accessToken) return true;
+  if (!accessToken) {
+    refreshTokenInBackground();
+    return ALLOW_NO_TOKEN;
+  }
   if (typeof candidate !== "string") return false;
 
   const expected = Buffer.from(accessToken);
@@ -233,7 +253,8 @@ io.on("connection", (socket) => {
   socket.emit("file:refresh");
 
   // The optional ack lets clients wait for the write before running the file.
-  socket.on("file:change", async ({ path: clientPath, content } = {}, ack) => {
+  socket.on("file:change", async (payload, ack) => {
+    const { path: clientPath, content } = payload || {};
     const filePath = resolveUserPath(clientPath);
 
     try {
@@ -259,6 +280,7 @@ io.on("connection", (socket) => {
   // Run sql queries on run event triggered from the client
   socket.on("run:query", async (query) => {
     try {
+      if (typeof query !== "string" || !query.trim()) throw new Error("Sorgu boş olamaz");
       socket.emit("result", await runQuery(query));
     } catch (error) {
       socket.emit("result", { error: true, code: error.code, message: error.sqlMessage || error.message });
@@ -269,16 +291,24 @@ io.on("connection", (socket) => {
     if (typeof data === "string") ptyProcess.write(data);
   });
 
-  socket.on("terminal:resize", ({ cols, rows } = {}) => {
+  socket.on("terminal:resize", (payload) => {
+    const { cols, rows } = payload || {};
     if (Number.isInteger(cols) && Number.isInteger(rows) && cols > 0 && rows > 0)
       ptyProcess.resize(Math.min(cols, 500), Math.min(rows, 200));
   });
 });
 
 const main = async () => {
-  accessToken = await loadToken();
-  if (!accessToken)
-    console.warn("SANDBOX_TOKEN tanımlı değil: sandbox kimlik doğrulaması olmadan çalışıyor.");
+  // At boot the metadata server can take a moment to answer.
+  await loadToken({ attempts: ALLOW_NO_TOKEN ? 1 : 5 });
+  if (!accessToken) {
+    if (ALLOW_NO_TOKEN)
+      console.warn("Erişim anahtarı yok: ALLOW_NO_TOKEN=true olduğu için kimlik doğrulaması kapalı.");
+    else
+      console.error(
+        "Erişim anahtarı bulunamadı (SANDBOX_TOKEN veya velox-sandbox-token metadata). Bağlantılar reddedilecek."
+      );
+  }
 
   startShell();
 
@@ -288,5 +318,8 @@ const main = async () => {
 
   server.listen(PORT, () => console.log(`🐳 Docker server running on port ${PORT}`));
 };
+
+process.on("uncaughtException", (error) => console.error("Uncaught exception:", error));
+process.on("unhandledRejection", (error) => console.error("Unhandled rejection:", error));
 
 main();

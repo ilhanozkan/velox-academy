@@ -14,9 +14,11 @@ const percent = (done, total) => (total > 0 ? Math.round((done / total) * 100) :
  */
 class ProgressService {
   static async requireEnrollment(userId, trainingId, trx) {
-    const enrollment = await Enrollment.query(trx)
-      .where({ user_id: userId, training_id: trainingId })
-      .first();
+    const query = Enrollment.query(trx).where({ user_id: userId, training_id: trainingId });
+    // Inside a transaction, lock the enrollment: concurrent completions for
+    // the same user and training then run one after the other and each sees
+    // the other's rows (otherwise both could miss the final completion).
+    const enrollment = await (trx ? query.forUpdate() : query).first();
 
     if (!enrollment) throw forbidden("Önce bu eğitime kayıt olmalısınız");
     return enrollment;

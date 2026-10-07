@@ -110,6 +110,10 @@ const toResponse = (error) => {
   if (error.type === "entity.too.large")
     return { status: 413, body: { error: "İstek gövdesi çok büyük" } };
 
+  // Other client errors raised by Express itself (e.g. a malformed URL).
+  if (error.status >= 400 && error.status < 500 && error.expose !== false)
+    return { status: error.status, body: { error: "Geçersiz istek" } };
+
   return null;
 };
 

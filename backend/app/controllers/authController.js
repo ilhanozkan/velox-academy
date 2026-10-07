@@ -63,7 +63,10 @@ class AuthController {
 
   static async changePassword(req, res) {
     const { currentPassword, newPassword } = req.body || {};
-    await UserService.changePassword(req.currentUser.id, currentPassword, newPassword);
+    const user = await UserService.changePassword(req.currentUser.id, currentPassword, newPassword);
+
+    // Other sessions end with the old password; keep this one signed in.
+    startSession(res, user);
     res.status(200).json({ message: "Parolanız güncellendi" });
   }
 }

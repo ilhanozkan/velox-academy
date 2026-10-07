@@ -7,6 +7,12 @@ module.exports = async () => {
   const knexConfig = require("../knexfile").test;
   const connection = knexConfig.connection;
 
+  // The suite rolls back every migration: refuse anything but a test database.
+  const database =
+    typeof connection === "string" ? new URL(connection).pathname.slice(1) : connection.database;
+  if (!database.endsWith("_test"))
+    throw new Error(`Refusing to run tests against "${database}": the database name must end with "_test".`);
+
   if (typeof connection === "object") {
     const admin = new Client({ ...connection, database: "postgres" });
     await admin.connect();

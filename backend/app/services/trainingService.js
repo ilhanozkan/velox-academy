@@ -207,7 +207,12 @@ class TrainingService {
     try {
       sandbox = await UserSandboxService.ensureSandbox(Number(userId), trainingId);
     } catch (error) {
-      if (!(error instanceof HttpError)) throw error;
+      if (!(error instanceof HttpError)) {
+        // Unexpected failure: undo the enrollment so that retrying works
+        // (it would otherwise answer 409 "already enrolled").
+        await Enrollment.query().deleteById(enrollment.id).catch(() => {});
+        throw error;
+      }
       sandboxError = error.message;
     }
 
