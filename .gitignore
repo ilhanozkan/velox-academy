@@ -2,7 +2,7 @@
 .vscode
 backend/app/application_default_credentials.json
 # Dependencies
-node_modules/
+node_modules
 
 # Logs
 npm-debug.log*
