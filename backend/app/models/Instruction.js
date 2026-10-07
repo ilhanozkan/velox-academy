@@ -9,7 +9,7 @@ class Instruction extends BaseModel {
   static get jsonSchema() {
     return {
       type: "object",
-      required: ["id", "name", "chapter_id"],
+      required: ["id", "name"],
       properties: {
         id: { type: "string", maxLength: 128, pattern: SLUG_PATTERN },
         name: { type: "string", minLength: 1, maxLength: 255 },

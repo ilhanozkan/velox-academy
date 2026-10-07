@@ -8,7 +8,7 @@ class WriteUp extends BaseModel {
   static get jsonSchema() {
     return {
       type: "object",
-      required: ["id", "file_path", "chapter_id"],
+      required: ["id", "file_path"],
       properties: {
         id: { type: "string", maxLength: 128 },
         title: { type: ["string", "null"], maxLength: 255 },

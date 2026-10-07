@@ -203,7 +203,8 @@ npm run db:reset      # rollback everything, migrate and seed
 ```
 
 In development the seeded admin account is `contact.ilhanozkan@gmail.com` /
-`1234` (override with `ADMIN_EMAIL` / `ADMIN_PASSWORD`).
+`1234` (override with `ADMIN_EMAIL` / `ADMIN_PASSWORD` before the first start).
+Existing installations keep this account: change its password after upgrading.
 
 ## 🔗 API Endpoints
 

@@ -125,6 +125,7 @@ From `backend/app` you can also run them by hand:
 | `npm run db:rollback:all` | Undo every migration |
 | `npm run db:seed` | Insert the demo catalog and the admin user |
 | `npm run db:reset` | Roll back everything, migrate and seed |
+| `npm run db:make-admin -- <email>` | Give an existing account the admin role |
 
 Use these scripts rather than the raw `knex` CLI: they also rename
 `add_user_sandboxes.js` to `02_add_user_sandboxes.js` in the `knex_migrations`
@@ -136,9 +137,16 @@ existing ones.
 ## Seeds
 
 Seeds only insert rows that do not exist yet (`ON CONFLICT DO NOTHING`), so
-running them repeatedly never overwrites content edited by an admin.
+running them repeatedly never overwrites content edited by an admin. They only
+fill values that are missing, e.g. lesson content after a migration was rolled
+back and re-applied. Because missing rows are recreated, a demo training that
+an admin deletes comes back on the next start in development; set
+`SEED_ON_START=false` to keep such deletions.
 
-- `seeds/01_admin_user.js` creates the admin account.
+- `seeds/01_admin_user.js` creates the admin account if no account with that
+  username or e-mail exists. It never changes existing accounts (promoting an
+  account by name would let anyone who registers that username become admin);
+  use `npm run db:make-admin -- <email>` instead.
 - `seeds/02_catalog.js` creates the demo catalog: 4 categories, 4 trainings,
   9 chapters, 30 instructions and 9 achievements. The structure lives in
   `seeds/data/catalog.js` and every instruction's markdown body in
@@ -159,4 +167,9 @@ Seeds run on startup unless `NODE_ENV=production`; set `SEED_ON_START=true` or
 | `DB_POOL_MAX` | `10` | Maximum pool size |
 | `DB_CONNECT_RETRIES` | `10` | Connection attempts on startup (2 s apart) |
 | `SEED_ON_START` | `true` outside production | Run seeds on startup |
-| `ADMIN_USERNAME` / `ADMIN_EMAIL` / `ADMIN_PASSWORD` | `admin` / `contact.ilhanozkan@gmail.com` / `1234` | Seeded admin account. In production the admin is only created when `ADMIN_PASSWORD` is set. |
+| `ADMIN_USERNAME` / `ADMIN_EMAIL` / `ADMIN_PASSWORD` | `admin` / `contact.ilhanozkan@gmail.com` / `1234` | Admin account created on a database without one. In production the admin is only created when `ADMIN_PASSWORD` is set. |
+
+> **Existing installations** keep the admin account the original schema
+> created (`admin` / `1234`); the upgrade gives it the `admin` role. Change its
+> password after upgrading — the variables above do not modify existing
+> accounts.

@@ -12,7 +12,7 @@ class UserSandbox extends BaseModel {
   static get jsonSchema() {
     return {
       type: "object",
-      required: ["user_id", "training_id", "vm_instance_name"],
+      required: ["vm_instance_name"],
       properties: {
         id: { type: "integer" },
         user_id: { type: "integer" },
