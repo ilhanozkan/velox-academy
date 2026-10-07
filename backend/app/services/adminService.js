@@ -9,6 +9,7 @@ const InstructionService = require("./instructionService");
 const WriteUpService = require("./writeUpService");
 const AchievementService = require("./achievementService");
 const SandboxService = require("./sandboxService");
+const UserSandboxService = require("./userSandboxService");
 
 const count = async (query) => Number((await query.count("* as count").first()).count);
 
@@ -49,6 +50,10 @@ class AdminService {
       blocked_at: status === "blocked" ? new Date().toISOString() : null,
     });
     if (!user) throw notFound("Kullanıcı bulunamadı");
+
+    // A blocked user's sandbox VMs keep running (and accepting their token)
+    // unless they are released.
+    if (status === "blocked") await UserSandboxService.releaseAll({ user_id: user.id });
     return user;
   }
 
@@ -223,8 +228,14 @@ class AdminService {
   }
 
   static async deleteEnrollment(id) {
-    const deleted = await Enrollment.query().deleteById(id);
-    if (!deleted) throw notFound("Kayıt bulunamadı");
+    const enrollment = await Enrollment.query().findById(id);
+    if (!enrollment) throw notFound("Kayıt bulunamadı");
+
+    await UserSandboxService.releaseAll({
+      user_id: enrollment.user_id,
+      training_id: enrollment.training_id,
+    });
+    await Enrollment.query().deleteById(id);
 
     return { enrollmentId: Number(id), deletedAt: new Date(), status: "deleted" };
   }

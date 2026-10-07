@@ -9,6 +9,7 @@
  *   node scripts/db.js seed           run the (idempotent) seed files
  *   node scripts/db.js reset          rollback everything, migrate and seed
  *   node scripts/db.js status         list completed and pending migrations
+ *   node scripts/db.js make-admin <email>  give an existing account the admin role
  */
 const db = require("../config/db");
 const {
@@ -33,6 +34,17 @@ const status = async () => {
   pending.forEach((m) => console.log(`  [ ] ${m.file}`));
 };
 
+const makeAdmin = async () => {
+  const email = process.argv[3];
+  if (!email) throw new Error("Kullanım: node scripts/db.js make-admin <e-posta>");
+
+  const updated = await db("users")
+    .whereRaw("lower(email) = ?", [email.trim().toLowerCase()])
+    .update({ role: "admin" });
+  if (!updated) throw new Error(`${email} adresiyle kayıtlı kullanıcı bulunamadı.`);
+  console.log(`${email} artık yönetici.`);
+};
+
 const commands = {
   migrate: migrateLatest,
   rollback: () => rollback(process.argv.includes("--all")),
@@ -43,6 +55,7 @@ const commands = {
     await runSeeds();
   },
   status,
+  "make-admin": makeAdmin,
 };
 
 const main = async () => {

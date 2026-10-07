@@ -2,7 +2,7 @@ const { UniqueViolationError } = require("objection");
 
 const UserSandbox = require("../models/UserSandbox");
 const Training = require("../models/Training");
-const { notFound } = require("../utils/httpError");
+const { notFound, conflict } = require("../utils/httpError");
 const { activeProvider, providerFor } = require("./sandboxProviders");
 
 // Provisioning runs in the background; tests (and graceful shutdown) can wait
@@ -76,6 +76,9 @@ class UserSandboxService {
    * Returns the learner's sandbox for a training, starting provisioning if it
    * does not exist, was deleted or failed. Returns immediately; the sandbox is
    * "creating" until the background provisioning finishes.
+   *
+   * Starting provisioning "claims" the row with a conditional update, so two
+   * concurrent requests can never provision the same sandbox twice.
    */
   static async ensureSandbox(userId, trainingId, { recreate = false } = {}) {
     const existing = await UserSandbox.query()
@@ -85,11 +88,12 @@ class UserSandboxService {
     if (existing?.vm_status === "creating") return existing;
     if (existing?.vm_status === "running" && !recreate) return existing;
 
+    // A previous job for this sandbox is still finishing (e.g. it was
+    // deleted while being created); wait for it rather than racing it.
+    if (existing && inflight.has(existing.id))
+      throw conflict("Sanal makine üzerinde süren bir işlem var. Lütfen birkaç saniye sonra tekrar deneyin.");
+
     const provider = activeProvider();
-
-    // Recreating a running sandbox: release the old VM first.
-    if (existing?.vm_status === "running") await providerFor(existing).destroy(existing);
-
     const fields = {
       provider: provider.name,
       vm_instance_name: provider.instanceName(userId, trainingId),
@@ -103,7 +107,11 @@ class UserSandboxService {
 
     let sandbox;
     if (existing) {
-      sandbox = await UserSandbox.query().patchAndFetchById(existing.id, fields);
+      const claimed = await UserSandbox.query()
+        .patch(fields)
+        .where({ id: existing.id, vm_status: existing.vm_status });
+      if (!claimed) return await UserSandbox.query().findById(existing.id);
+      sandbox = await UserSandbox.query().findById(existing.id);
     } else {
       try {
         sandbox = await UserSandbox.query().insert({
@@ -120,34 +128,51 @@ class UserSandboxService {
       }
     }
 
-    this.provision(sandbox.id);
+    // When recreating a running sandbox the provider replaces the existing VM.
+    this.provision(sandbox);
     return sandbox;
   }
 
-  /** Creates the VM for a "creating" sandbox and records the outcome. */
-  static provision(sandboxId) {
-    const job = (async () => {
-      const sandbox = await UserSandbox.query().findById(sandboxId);
-      if (!sandbox) return;
+  /**
+   * Creates the VM for a sandbox claimed as "creating" and records the outcome.
+   * The result is only written if the row is still the one this job claimed;
+   * if the sandbox was deleted (or its user/training) in the meantime, the
+   * new VM is released instead of being left running unnoticed.
+   */
+  static provision(sandbox) {
+    const claim = { id: sandbox.id, vm_status: "creating", vm_instance_name: sandbox.vm_instance_name };
+    const sameClaim = (query) =>
+      query
+        .where(claim)
+        .where((q) =>
+          sandbox.access_token === null
+            ? q.whereNull("access_token")
+            : q.where("access_token", sandbox.access_token)
+        );
 
+    const job = (async () => {
       try {
         const training = await Training.query().findById(sandbox.training_id);
         const result = await providerFor(sandbox).create(sandbox, training);
 
-        await UserSandbox.query().patchAndFetchById(sandboxId, {
-          ...result,
-          vm_status: "running",
-          error_message: null,
-        });
+        const updated = await sameClaim(UserSandbox.query().patch({ ...result, vm_status: "running" }));
+        if (!updated) {
+          console.warn(`Sandbox ${sandbox.id} changed while it was being created; releasing the new VM.`);
+          await providerFor(sandbox)
+            .destroy({ ...sandbox, ...result })
+            .catch((error) => console.error(`Could not release VM ${sandbox.vm_instance_name}:`, error.message));
+        }
       } catch (error) {
-        console.error(`Sandbox ${sandboxId} provisioning failed:`, error);
-        await UserSandbox.query()
-          .patchAndFetchById(sandboxId, { vm_status: "error", error_message: friendlyError(error) })
-          .catch((patchError) => console.error(patchError));
+        console.error(`Sandbox ${sandbox.id} provisioning failed:`, error);
+        await sameClaim(
+          UserSandbox.query().patch({ vm_status: "error", error_message: friendlyError(error) })
+        ).catch((patchError) => console.error(patchError));
       }
-    })().finally(() => inflight.delete(sandboxId));
+    })()
+      .catch((error) => console.error(`Sandbox ${sandbox.id} provisioning crashed:`, error))
+      .finally(() => inflight.delete(sandbox.id));
 
-    inflight.set(sandboxId, job);
+    inflight.set(sandbox.id, job);
     return job;
   }
 
@@ -157,7 +182,9 @@ class UserSandboxService {
 
   /** Deletes the VM and marks the sandbox deleted; the row keeps the history. */
   static async deleteSandbox(sandbox) {
-    if (sandbox.vm_status !== "deleted") {
+    // A sandbox that is still being created has no VM to delete yet; its
+    // provisioning job notices the deletion and releases the VM itself.
+    if (sandbox.vm_status !== "deleted" && sandbox.vm_status !== "creating") {
       try {
         await providerFor(sandbox).destroy(sandbox);
       } catch (error) {
@@ -185,24 +212,31 @@ class UserSandboxService {
   }
 
   /**
-   * Best-effort VM cleanup before rows are removed by ON DELETE CASCADE
-   * (deleting a user or a training). Failures are logged, not thrown, so an
-   * unreachable cloud API does not block the deletion.
+   * Best-effort VM cleanup when a user, a training or an enrollment goes away
+   * (or a user is blocked). Rows that stay are marked deleted; rows removed by
+   * ON DELETE CASCADE afterwards are gone anyway. Failures are logged, not
+   * thrown, so an unreachable cloud API does not block the operation.
+   * Sandboxes still being created are released by their provisioning job.
    */
   static async releaseAll(where) {
     const sandboxes = await UserSandbox.query()
       .where(where)
-      .whereNot("vm_status", "deleted");
+      .whereNotIn("vm_status", ["deleted", "creating"]);
 
     await Promise.all(
-      sandboxes.map((sandbox) =>
-        providerFor(sandbox)
-          .destroy(sandbox)
-          .catch((error) =>
-            console.error(`Could not delete VM ${sandbox.vm_instance_name}:`, error.message)
-          )
-      )
+      sandboxes.map(async (sandbox) => {
+        try {
+          await providerFor(sandbox).destroy(sandbox);
+        } catch (error) {
+          console.error(`Could not delete VM ${sandbox.vm_instance_name}:`, error.message);
+        }
+      })
     );
+
+    await UserSandbox.query()
+      .where(where)
+      .whereNot("vm_status", "deleted")
+      .patch({ vm_status: "deleted", vm_external_ip: null, error_message: null });
   }
 
   static async refreshSandboxIP(sandbox) {

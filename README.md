@@ -123,8 +123,9 @@ cd velox-academy
 
    In development the API uses the `local` sandbox provider: every learner is
    connected to this service on `http://localhost:9000`, so no Google Cloud
-   account is needed. To require a token, start both compose projects with the
-   same `SANDBOX_TOKEN` environment variable.
+   account is needed. This compose file sets `ALLOW_NO_TOKEN=true`; to require
+   a token instead, start both compose projects with the same `SANDBOX_TOKEN`
+   environment variable.
 
 ### Running Locally
 
@@ -153,8 +154,11 @@ cd velox-academy
 4. **Start VM Service** (needs MySQL with `vm-image/database/sample.sql` loaded)
    ```bash
    cd vm-image
-   npm run dev
+   ALLOW_NO_TOKEN=true npm run dev   # or SANDBOX_TOKEN=... matching the API's LOCAL_SANDBOX_TOKEN
    ```
+
+   Without a token (from `SANDBOX_TOKEN` or the VM's metadata) the service
+   refuses every connection unless `ALLOW_NO_TOKEN=true`.
 
 ### Running the tests
 
@@ -216,7 +220,8 @@ learner and training from an instance template.
 
 Each VM receives a random access token through the `velox-sandbox-token`
 instance metadata key, and the sandbox service refuses connections without it.
-Rebuild the image from the current `vm-image/` code to enable this check.
+Rebuild the image from the current `vm-image/` code to enable this check (and
+do not set `ALLOW_NO_TOKEN` on VMs).
 
 ## 📊 Database Schema
 
@@ -243,7 +248,8 @@ npm run db:reset      # rollback everything, migrate and seed
 ```
 
 In development the seeded admin account is `contact.ilhanozkan@gmail.com` /
-`1234` (override with `ADMIN_EMAIL` / `ADMIN_PASSWORD`).
+`1234` (override with `ADMIN_EMAIL` / `ADMIN_PASSWORD` before the first start).
+Existing installations keep this account: change its password after upgrading.
 
 ## 🔗 API Endpoints
 
@@ -269,7 +275,10 @@ The backend provides RESTful APIs for the following areas; see
 - Login, registration and password changes are rate limited per IP.
 - Uploads are restricted to images with random file names; file names in
   requests cannot escape the images directory.
-- Sandbox VMs require a per-sandbox access token.
+- Sandbox VMs require a per-sandbox access token and refuse all connections
+  when they have none.
+- Changing a password ends the account's other sessions; state-changing
+  requests from origins outside `CORS_ORIGINS` are rejected.
 
 ## 🎯 Key Features
 

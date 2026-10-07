@@ -16,7 +16,8 @@
     "db:rollback:all": "node scripts/db.js rollback --all",
     "db:seed": "node scripts/db.js seed",
     "db:reset": "node scripts/db.js reset",
-    "db:status": "node scripts/db.js status"
+    "db:status": "node scripts/db.js status",
+    "db:make-admin": "node scripts/db.js make-admin"
   },
   "keywords": [],
   "author": "",

@@ -26,10 +26,17 @@ exports.seed = async function (knex) {
   );
 
   for (const { chapters, category, ...training } of trainings) {
+    // No conflict target: skip on any unique column (id or slug).
     await knex("trainings")
       .insert({ ...training, category_id: categoryIds[category] ?? null })
-      .onConflict("id")
+      .onConflict()
       .ignore();
+
+    // Another training already uses this slug: leave the catalog as it is.
+    if (!(await knex("trainings").where({ id: training.id }).first())) {
+      console.warn(`"${training.slug}" kısa adı başka bir eğitimde kullanıldığı için ${training.id} atlandı.`);
+      continue;
+    }
 
     // Trainings created before the duration column existed get a value, but
     // one set by an admin is never replaced.
@@ -57,12 +64,28 @@ exports.seed = async function (knex) {
           })
           .onConflict("id")
           .ignore();
+        // Restore content that is missing, e.g. after rolling back and
+        // re-applying the migration that added the column.
+        await knex("instructions")
+          .where({ id: instruction.id })
+          .whereNull("content")
+          .update({ content, description: summarize(content) });
 
         if (achievement) {
           await knex("achievements")
             .insert({ ...achievement, instruction_id: instruction.id })
             .onConflict("id")
             .ignore();
+          // Re-link achievements whose instruction was deleted and recreated,
+          // and fill the icon/points columns when they were (re)added empty.
+          await knex("achievements")
+            .where({ id: achievement.id })
+            .whereNull("instruction_id")
+            .update({ instruction_id: instruction.id });
+          await knex("achievements")
+            .where({ id: achievement.id })
+            .whereNull("icon")
+            .update({ icon: achievement.icon, points: achievement.points });
         }
       }
     }

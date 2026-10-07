@@ -8,7 +8,6 @@ class Enrollment extends BaseModel {
   static get jsonSchema() {
     return {
       type: "object",
-      required: ["user_id", "training_id"],
       properties: {
         id: { type: "integer" },
         user_id: { type: "integer" },

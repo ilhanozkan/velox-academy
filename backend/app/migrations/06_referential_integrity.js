@@ -50,9 +50,21 @@ exports.up = async function (knex) {
 
   // Enrollments: one row per user and training.
   await knex("enrollments").whereNull("user_id").delete();
-  // Keep the oldest duplicate, but preserve completion from any of them.
+  // `completed` only had a default; old rows may hold NULL.
+  await knex("enrollments").whereNull("completed").update({ completed: false });
+
+  await knex.schema.alterTable("enrollments", function (table) {
+    table.timestamp("completed_at");
+  });
+  await knex("enrollments")
+    .where({ completed: true })
+    .update({ completed_at: knex.ref("updated_at") });
+
+  // Keep the oldest duplicate, but take over completion (and when it
+  // happened) from a completed duplicate.
   await knex.raw(`
-    UPDATE enrollments AS keep SET completed = true
+    UPDATE enrollments AS keep
+    SET completed = true, completed_at = dup.completed_at
     FROM enrollments AS dup
     WHERE dup.user_id = keep.user_id
       AND dup.training_id = keep.training_id
@@ -69,13 +81,8 @@ exports.up = async function (knex) {
   await knex.schema.alterTable("enrollments", function (table) {
     table.integer("user_id").notNullable().alter();
     table.boolean("completed").notNullable().defaultTo(false).alter();
-    table.timestamp("completed_at");
     table.unique(["user_id", "training_id"]);
   });
-
-  await knex("enrollments")
-    .where({ completed: true })
-    .update({ completed_at: knex.ref("updated_at") });
 };
 
 exports.down = async function (knex) {

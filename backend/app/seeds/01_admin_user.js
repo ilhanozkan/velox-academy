@@ -1,7 +1,10 @@
 const bcrypt = require("bcrypt");
 
-// Default development credentials. Override with ADMIN_EMAIL / ADMIN_PASSWORD;
-// production refuses to create an admin with the default password.
+// Creates the admin account when it does not exist yet. Default development
+// credentials can be overridden with ADMIN_EMAIL / ADMIN_PASSWORD; production
+// refuses to create an admin with the default password. Existing accounts are
+// never modified: promoting an account by name would let anyone who registers
+// that username become an admin.
 const DEFAULT_ADMIN_EMAIL = "contact.ilhanozkan@gmail.com";
 const DEFAULT_ADMIN_PASSWORD = "1234";
 
@@ -15,13 +18,7 @@ exports.seed = async function (knex) {
     .orWhere({ email })
     .first();
 
-  if (existing) {
-    // Accounts created before roles existed are promoted, nothing else changes.
-    if (existing.role !== "admin" && existing.username === username) {
-      await knex("users").where({ id: existing.id }).update({ role: "admin" });
-    }
-    return;
-  }
+  if (existing) return;
 
   if (process.env.NODE_ENV === "production" && !process.env.ADMIN_PASSWORD) {
     console.warn(

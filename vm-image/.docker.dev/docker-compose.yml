@@ -12,8 +12,11 @@ services:
       - MYSQL_USER=root
       - MYSQL_PASSWORD=12345678
       - MYSQL_DATABASE=w3schools
-      # Must match LOCAL_SANDBOX_TOKEN of the API; empty disables the check.
+      # Must match LOCAL_SANDBOX_TOKEN of the API. Without a token the service
+      # refuses connections unless ALLOW_NO_TOKEN is true (default here,
+      # because this compose file is for local development only).
       - SANDBOX_TOKEN=${SANDBOX_TOKEN:-}
+      - ALLOW_NO_TOKEN=${ALLOW_NO_TOKEN:-true}
     depends_on:
       - mysql
 

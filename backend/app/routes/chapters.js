@@ -23,7 +23,7 @@ router.delete("/:id", requireAdmin, ChapterController.deleteChapter);
 router.post("/:id/complete", requireAuth, ChapterController.completeChapter);
 
 // Bölüme ait yazıları getir
-router.get("/:id/writeups", ChapterController.getWriteUps);
+router.get("/:id/writeups", requireAuth, ChapterController.getWriteUps);
 
 // Bölüme ait yönergeleri getir
 router.get("/:id/instructions", ChapterController.getInstructions);

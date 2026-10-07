@@ -14,6 +14,9 @@ when the API runs directly).
   errors are `400` with one message per field in `details`; duplicates are
   `409`; a missing or expired session is `401`; insufficient rights or a
   blocked account is `403`; too many login attempts is `429`.
+- `POST`/`PUT`/`PATCH`/`DELETE` requests that carry an `Origin` header must
+  come from an origin listed in `CORS_ORIGINS` (`403` otherwise).
+- Changing the password ends every other session (tokens are tied to it).
 - Request bodies are JSON (max 1 MB). Unknown fields are ignored: only the
   fields listed for an endpoint are written, so `role` or `status` cannot be
   set through profile or registration requests.
@@ -71,7 +74,9 @@ Usernames are 3–30 characters (`A–Z a–z 0–9 _ . -`); passwords 6–72 ch
 ```
 
 `vmStatus` is `creating` → `running`, or `error` (with `errorMessage`), or
-`deleted`. Provisioning happens in the background: poll the sandbox until it
+`deleted`. While a previous operation on the sandbox is still finishing,
+creating it again answers `409`. Removing an enrollment or blocking a user
+deletes their sandboxes. Provisioning happens in the background: poll the sandbox until it
 leaves `creating`. `accessUrl` and `accessToken` are only set while running and
 only returned to the owner. The browser passes the token to the sandbox
 service as the Socket.IO `auth.token` and as the `x-sandbox-token` header for
@@ -95,7 +100,8 @@ The user is always taken from the session; a `userId` in the body is ignored.
 | Method | Path | Access |
 | --- | --- | --- |
 | GET | `/categories`, `/categories/:id`, `/categories/:id/trainings` | public |
-| GET | `/chapters`, `/chapters/:id`, `/chapters/:id/instructions`, `/chapters/:id/writeups` | public |
+| GET | `/chapters`, `/chapters/:id`, `/chapters/:id/instructions` | public |
+| GET | `/chapters/:id/writeups` | user |
 | GET | `/instructions`, `/instructions/:id` | public |
 | GET | `/achievements`, `/writeups`, `/sandboxes`, `/images` (and `/:id`) | user |
 | GET | `/writeups/:id/download` | user |

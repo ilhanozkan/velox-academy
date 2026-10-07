@@ -14,6 +14,16 @@ const list = (value, fallback) =>
 const bool = (value, fallback) =>
   value === undefined || value === "" ? fallback : value === "true";
 
+// Express "trust proxy": a hop count ("1"), a boolean, or addresses/subnets
+// ("loopback", "10.0.0.0/8"). A numeric string must become a number: Express
+// would otherwise treat "1" as an IP address and trust nothing.
+const trustProxy = (value) => {
+  if (value === undefined || value === "" || value === "false") return false;
+  if (value === "true") return true;
+  if (/^\d+$/.test(value)) return Number(value);
+  return value;
+};
+
 // A fixed secret keeps development sessions valid across nodemon restarts.
 // Production must provide its own; the previous secret was committed to git.
 const DEV_JWT_SECRET = "velox-development-secret-do-not-use-in-production";
@@ -36,9 +46,9 @@ const config = {
   isProduction,
   isTest: env === "test",
   port: Number(process.env.PORT) || 5001,
-  // Express "trust proxy" setting, needed for correct client IPs (rate
-  // limiting) behind a load balancer. E.g. "1" or "loopback".
-  trustProxy: process.env.TRUST_PROXY || false,
+  // Needed for correct client IPs (rate limiting) behind a load balancer,
+  // e.g. TRUST_PROXY=1 for one proxy hop.
+  trustProxy: trustProxy(process.env.TRUST_PROXY),
   corsOrigins: list(process.env.CORS_ORIGINS, "http://localhost:3000"),
 
   auth: {
@@ -59,6 +69,10 @@ const config = {
     // points every learner at one sandbox service (vm-image/) for development,
     // "disabled" turns sandboxes off.
     provider: process.env.SANDBOX_PROVIDER || (isProduction ? "gcp" : "local"),
+    // Mark sandboxes left "creating" by a previous run as failed on startup.
+    // Provisioning runs inside the API process, so disable this when several
+    // API instances share a database.
+    reconcileOnStart: bool(process.env.SANDBOX_RECONCILE_ON_START, true),
     port: Number(process.env.SANDBOX_PORT) || 9000,
     local: {
       // URL the learner's browser uses to reach the local sandbox service.
@@ -80,3 +94,4 @@ const config = {
 };
 
 module.exports = config;
+module.exports.parseTrustProxy = trustProxy;

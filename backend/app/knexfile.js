@@ -31,9 +31,17 @@ module.exports = {
     ...base,
     connection: connection(process.env.DB_NAME || "velox"),
   },
+  // Tests reset the whole database, so they never use DATABASE_URL (it may
+  // point at real data); use TEST_DATABASE_URL or the DB_* variables.
   test: {
     ...base,
-    connection: connection(process.env.DB_NAME || "velox_test"),
+    connection: process.env.TEST_DATABASE_URL || {
+      host: process.env.DB_HOST || "db",
+      port: Number(process.env.DB_PORT) || 5432,
+      database: process.env.DB_NAME || "velox_test",
+      user: process.env.DB_USER || "postgres",
+      password: process.env.DB_PASSWORD || "postgres",
+    },
   },
   production: {
     ...base,
