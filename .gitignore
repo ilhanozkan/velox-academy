@@ -7,3 +7,6 @@ node_modules
 # Logs
 npm-debug.log*
 yarn-error.log*
+
+# Local environment files (see backend/app/.env.example)
+backend/app/.env

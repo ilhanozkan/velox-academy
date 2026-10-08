@@ -1,83 +1,41 @@
 const ImageService = require("../services/imageService");
+const { notFound, pick, wrapController } = require("../utils/httpError");
 
 class ImageController {
   static async getAllImages(req, res) {
-    try {
-      const images = await ImageService.getAllImages();
-      res.status(200).json({ images });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: "Sunucu hatası" });
-    }
+    const images = await ImageService.getAllImages();
+    res.status(200).json({ images });
   }
 
   static async getImageById(req, res) {
-    try {
-      const { id } = req.params;
-      const image = await ImageService.getImageById(id);
-      if (!image) {
-        return res.status(404).json({ error: "İmaj bulunamadı" });
-      }
-      res.status(200).json({ image });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: "Sunucu hatası" });
-    }
+    const image = await ImageService.getImageById(req.params.id);
+    if (!image) throw notFound("İmaj bulunamadı");
+    res.status(200).json({ image });
   }
 
   static async createImage(req, res) {
-    try {
-      const imageData = req.body;
-      const newImage = await ImageService.createImage(imageData);
-      res.status(201).json({ message: "İmaj oluşturuldu", image: newImage });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: "Sunucu hatası" });
-    }
+    const image = await ImageService.createImage(pick(req.body, ImageService.FIELDS));
+    res.status(201).json({ message: "İmaj oluşturuldu", image });
   }
 
   static async updateImage(req, res) {
-    try {
-      const { id } = req.params;
-      const imageData = req.body;
-      const updatedImage = await ImageService.updateImage(id, imageData);
-      res
-        .status(200)
-        .json({ message: "İmaj güncellendi", image: updatedImage });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: "Sunucu hatası" });
-    }
+    const image = await ImageService.updateImage(
+      req.params.id,
+      pick(req.body, ImageService.FIELDS)
+    );
+    res.status(200).json({ message: "İmaj güncellendi", image });
   }
 
   static async deleteImage(req, res) {
-    try {
-      const { id } = req.params;
-      const result = await ImageService.deleteImage(id);
-      res.status(200).json({
-        message: "İmaj silindi",
-        deletion: result,
-      });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: error.message });
-    }
+    const deletion = await ImageService.deleteImage(req.params.id);
+    res.status(200).json({ message: "İmaj silindi", deletion });
   }
 
   // Business logic endpoints
   static async uploadImage(req, res) {
-    try {
-      const imageData = req.body;
-      const result = await ImageService.uploadImage(imageData);
-      res.status(200).json({
-        message: "İmaj yüklendi",
-        upload: result,
-      });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: "Sunucu hatası" });
-    }
+    const upload = await ImageService.uploadImage(pick(req.body, ImageService.FIELDS));
+    res.status(200).json({ message: "İmaj yüklendi", upload });
   }
 }
 
-module.exports = ImageController;
+module.exports = wrapController(ImageController);

@@ -1,6 +1,18 @@
 const Sandbox = require("../models/Sandbox");
+const { notFound } = require("../utils/httpError");
 
+// Columns an admin may set on a chapter sandbox definition.
+const SANDBOX_FIELDS = ["id", "name", "description", "image_file_path", "chapter_id"];
+
+/**
+ * Chapter sandbox definitions (which image a chapter uses). The VMs learners
+ * actually work in are user sandboxes, see userSandboxService.js.
+ */
 class SandboxService {
+  static get FIELDS() {
+    return SANDBOX_FIELDS;
+  }
+
   static async getAllSandboxes() {
     return await Sandbox.query();
   }
@@ -14,36 +26,32 @@ class SandboxService {
   }
 
   static async updateSandbox(id, sandboxData) {
-    return await Sandbox.query().patchAndFetchById(id, sandboxData);
+    const { id: _ignored, ...changes } = sandboxData;
+    const sandbox = await Sandbox.query().patchAndFetchById(id, changes);
+    if (!sandbox) throw notFound("Sandbox bulunamadı");
+    return sandbox;
   }
 
   static async deleteSandbox(id) {
-    await Sandbox.query().deleteById(id);
+    const deleted = await Sandbox.query().deleteById(id);
+    if (!deleted) throw notFound("Sandbox bulunamadı");
   }
 
-  // Business logic methods based on UML diagram
+  // Business logic methods based on UML diagram. These describe the image a
+  // sandbox definition uses; they used to return made-up URLs and ports.
   static async initiateImage(sandboxId) {
     const sandbox = await Sandbox.query()
       .findById(sandboxId)
       .withGraphFetched("image");
 
-    if (!sandbox) {
-      throw new Error("Sandbox not found");
-    }
+    if (!sandbox) throw notFound("Sandbox bulunamadı");
+    if (!sandbox.image) throw notFound("Bu sandbox ile ilişkili bir imaj yok");
 
-    if (!sandbox.image) {
-      throw new Error("No image associated with this sandbox");
-    }
-
-    // In a real implementation, this would start a container/VM with the image
-    // For now, we'll return initiation information
     return {
       sandboxId: sandbox.id,
       imageId: sandbox.image.id,
-      status: "initiating",
-      initiatedAt: new Date(),
-      accessUrl: `http://sandbox-${sandbox.id}.local`,
-      ports: [8080, 3000, 5000], // Example ports
+      imageFilePath: sandbox.image.file_path,
+      status: "ready",
     };
   }
 
@@ -52,16 +60,12 @@ class SandboxService {
       .findById(sandboxId)
       .withGraphFetched("image");
 
-    if (!sandbox) {
-      throw new Error("Sandbox not found");
-    }
+    if (!sandbox) throw notFound("Sandbox bulunamadı");
 
-    // In a real implementation, this would stop the running container/VM
     return {
       sandboxId: sandbox.id,
       imageId: sandbox.image ? sandbox.image.id : null,
       status: "stopped",
-      stoppedAt: new Date(),
     };
   }
 }

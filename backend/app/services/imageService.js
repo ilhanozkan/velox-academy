@@ -1,6 +1,14 @@
 const Image = require("../models/Image");
+const { notFound } = require("../utils/httpError");
+
+// Columns an admin may set on a sandbox image record.
+const IMAGE_FIELDS = ["id", "name", "file_path", "file_id", "sandbox_id"];
 
 class ImageService {
+  static get FIELDS() {
+    return IMAGE_FIELDS;
+  }
+
   static async getAllImages() {
     return await Image.query();
   }
@@ -14,17 +22,16 @@ class ImageService {
   }
 
   static async updateImage(id, imageData) {
-    return await Image.query().patchAndFetchById(id, imageData);
+    const { id: _ignored, ...changes } = imageData;
+    const image = await Image.query().patchAndFetchById(id, changes);
+    if (!image) throw notFound("İmaj bulunamadı");
+    return image;
   }
 
   // Business logic methods based on UML diagram
   static async uploadImage(imageData) {
-    // In a real implementation, this would handle file upload to storage
-    // For now, we'll simulate the upload process
-    const uploadedImage = await Image.query().insert({
-      ...imageData,
-      uploadedAt: new Date(),
-    });
+    // Registers an image record; the binary goes through /api/static-images.
+    const uploadedImage = await Image.query().insert(imageData);
 
     return {
       image: uploadedImage,
@@ -34,20 +41,10 @@ class ImageService {
   }
 
   static async deleteImage(id) {
-    const image = await Image.query().findById(id);
+    const deleted = await Image.query().deleteById(id);
+    if (!deleted) throw notFound("İmaj bulunamadı");
 
-    if (!image) {
-      throw new Error("Image not found");
-    }
-
-    // In a real implementation, this would also delete the physical file
-    await Image.query().deleteById(id);
-
-    return {
-      imageId: id,
-      deletedAt: new Date(),
-      status: "deleted",
-    };
+    return { imageId: id, deletedAt: new Date(), status: "deleted" };
   }
 }
 

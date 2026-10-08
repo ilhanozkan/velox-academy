@@ -1,8 +1,17 @@
 const Instruction = require("../models/Instruction");
+const { notFound } = require("../utils/httpError");
+const ProgressService = require("./progressService");
+
+// Columns an admin may set on an instruction.
+const INSTRUCTION_FIELDS = ["id", "name", "description", "content", "chapter_id", "position"];
 
 class InstructionService {
+  static get FIELDS() {
+    return INSTRUCTION_FIELDS;
+  }
+
   static async getAllInstructions() {
-    return await Instruction.query();
+    return await Instruction.query().orderBy(["chapter_id", "position"]);
   }
 
   static async getInstructionById(id) {
@@ -10,51 +19,36 @@ class InstructionService {
   }
 
   static async createInstruction(instructionData) {
+    // New instructions go to the end of the chapter unless a position is given.
+    if (instructionData.position === undefined && instructionData.chapter_id) {
+      const { max } = await Instruction.query()
+        .where("chapter_id", instructionData.chapter_id)
+        .max("position as max")
+        .first();
+      instructionData = { ...instructionData, position: (max || 0) + 1 };
+    }
     return await Instruction.query().insert(instructionData);
   }
 
   static async updateInstruction(id, instructionData) {
-    return await Instruction.query().patchAndFetchById(id, instructionData);
+    const { id: _ignored, ...changes } = instructionData;
+    const instruction = await Instruction.query().patchAndFetchById(id, changes);
+    if (!instruction) throw notFound("Yönerge bulunamadı");
+    return instruction;
   }
 
   static async deleteInstruction(id) {
-    await Instruction.query().deleteById(id);
+    const deleted = await Instruction.query().deleteById(id);
+    if (!deleted) throw notFound("Yönerge bulunamadı");
   }
 
   // Business logic methods based on UML diagram
   static async completeInstruction(instructionId, userId) {
-    // This method would typically:
-    // 1. Mark the instruction as completed for the user
-    // 2. Award any associated achievements
-    // 3. Update user progress
+    return await ProgressService.completeInstruction(userId, instructionId);
+  }
 
-    const instruction = await Instruction.query()
-      .findById(instructionId)
-      .withGraphFetched("achievements");
-
-    if (!instruction) {
-      throw new Error("Instruction not found");
-    }
-
-    // Award achievements if any exist for this instruction
-    const achievements = [];
-    if (instruction.achievements && instruction.achievements.length > 0) {
-      for (const achievement of instruction.achievements) {
-        achievements.push({
-          achievementId: achievement.id,
-          userId: userId,
-          earnedAt: new Date(),
-        });
-      }
-    }
-
-    return {
-      instructionId,
-      userId,
-      completedAt: new Date(),
-      status: "completed",
-      achievements: achievements,
-    };
+  static async uncompleteInstruction(instructionId, userId) {
+    return await ProgressService.uncompleteInstruction(userId, instructionId);
   }
 }
 

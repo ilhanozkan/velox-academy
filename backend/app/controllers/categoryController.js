@@ -1,96 +1,47 @@
 const CategoryService = require("../services/categoryService");
+const { notFound, pick, wrapController } = require("../utils/httpError");
+
+const FIELDS = ["name", "description"];
 
 class CategoryController {
   static async getAllCategories(req, res) {
-    try {
-      const categories = await CategoryService.getAllCategories();
-      res.status(200).json({ categories });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: "Sunucu hatası" });
-    }
+    const categories = await CategoryService.getAllCategories();
+    res.status(200).json({ categories });
   }
 
   static async getCategoryById(req, res) {
-    try {
-      const { id } = req.params;
-      const category = await CategoryService.getCategoryById(id);
-      if (!category) {
-        return res.status(404).json({ error: "Kategori bulunamadı" });
-      }
-      res.status(200).json({ category });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: "Sunucu hatası" });
-    }
+    const category = await CategoryService.getCategoryById(req.params.id);
+    if (!category) throw notFound("Kategori bulunamadı");
+    res.status(200).json({ category });
   }
 
   static async createCategory(req, res) {
-    try {
-      const categoryData = req.body;
-      const newCategory = await CategoryService.createCategory(categoryData);
-      res
-        .status(201)
-        .json({ message: "Kategori oluşturuldu", category: newCategory });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: "Sunucu hatası" });
-    }
+    const category = await CategoryService.createCategory(pick(req.body, FIELDS));
+    res.status(201).json({ message: "Kategori oluşturuldu", category });
   }
 
   static async updateCategory(req, res) {
-    try {
-      const { id } = req.params;
-      const categoryData = req.body;
-      const updatedCategory = await CategoryService.updateCategory(
-        id,
-        categoryData
-      );
-      res
-        .status(200)
-        .json({ message: "Kategori güncellendi", category: updatedCategory });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: "Sunucu hatası" });
-    }
+    const category = await CategoryService.updateCategory(req.params.id, pick(req.body, FIELDS));
+    res.status(200).json({ message: "Kategori güncellendi", category });
   }
 
   static async deleteCategory(req, res) {
-    try {
-      const { id } = req.params;
-      await CategoryService.deleteCategory(id);
-      res.status(200).json({ message: "Kategori silindi" });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: "Sunucu hatası" });
-    }
+    await CategoryService.deleteCategory(req.params.id);
+    res.status(200).json({ message: "Kategori silindi" });
   }
 
   // Business logic endpoints
   static async getTrainings(req, res) {
-    try {
-      const { id } = req.params;
-      const trainings = await CategoryService.getTrainings(id);
-      res.status(200).json({ trainings });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: "Sunucu hatası" });
-    }
+    const trainings = await CategoryService.getTrainings(req.params.id);
+    res.status(200).json({ trainings });
   }
 
   static async findTraining(req, res) {
-    try {
-      const { id, trainingId } = req.params;
-      const training = await CategoryService.findTraining(id, trainingId);
-      if (!training) {
-        return res.status(404).json({ error: "Eğitim bulunamadı" });
-      }
-      res.status(200).json({ training });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: "Sunucu hatası" });
-    }
+    const training = await CategoryService.findTraining(req.params.id, req.params.trainingId);
+    if (!training) throw notFound("Eğitim bulunamadı");
+    res.status(200).json({ training });
   }
 }
 
-module.exports = CategoryController;
+module.exports = wrapController(CategoryController);
+module.exports.FIELDS = FIELDS;

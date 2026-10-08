@@ -1,25 +1,25 @@
 const express = require("express");
 const ImageController = require("../controllers/imageController");
-const authMiddleware = require("../utils/authMiddleware");
+const { requireAuth, requireAdmin } = require("../middleware/auth");
 const router = express.Router();
 
 // Tüm imajları getir
-router.get("/", ImageController.getAllImages);
+router.get("/", requireAuth, ImageController.getAllImages);
 
 // Belirli bir imajı getir
-router.get("/:id", ImageController.getImageById);
+router.get("/:id", requireAuth, ImageController.getImageById);
 
 // Yeni imaj oluştur
-router.post("/", authMiddleware, ImageController.createImage);
+router.post("/", requireAdmin, ImageController.createImage);
 
 // İmajı güncelle
-router.put("/:id", authMiddleware, ImageController.updateImage);
+router.put("/:id", requireAdmin, ImageController.updateImage);
 
 // İmajı sil
-router.delete("/:id", authMiddleware, ImageController.deleteImage);
+router.delete("/:id", requireAdmin, ImageController.deleteImage);
 
 // Business logic routes
 // İmaj yükle
-router.post("/upload", authMiddleware, ImageController.uploadImage);
+router.post("/upload", requireAdmin, ImageController.uploadImage);
 
 module.exports = router;

@@ -1,189 +1,108 @@
+const fs = require("fs/promises");
+
 const UserService = require("../services/userService");
+const { notFound, forbidden, conflict, pick, wrapController } = require("../utils/httpError");
 
 class UserController {
   static async getAllUsers(req, res) {
-    try {
-      const users = await UserService.getAllUsers();
-      res.status(200).json({ users });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: "Sunucu hatası" });
-    }
+    const users = await UserService.getAllUsers();
+    res.status(200).json({ users });
   }
 
   static async getUserById(req, res) {
-    try {
-      const { id } = req.params;
-      const user = await UserService.getUserById(id);
-      if (!user) {
-        return res.status(404).json({ error: "Kullanıcı bulunamadı" });
-      }
-      res.status(200).json({ user });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: "Sunucu hatası" });
-    }
+    const user = await UserService.getUserById(req.params.id);
+    if (!user) throw notFound("Kullanıcı bulunamadı");
+    res.status(200).json({ user });
   }
 
+  // Profile fields only. Admins may additionally reset the password; roles
+  // and blocking go through /api/admin. Previously any logged-in user could
+  // change any account, including its password (stored unhashed).
   static async updateUser(req, res) {
-    try {
-      const { id } = req.params;
-      const userData = req.body;
-      const updatedUser = await UserService.updateUser(id, userData);
-      res
-        .status(200)
-        .json({ message: "Kullanıcı güncellendi", user: updatedUser });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: "Sunucu hatası" });
-    }
+    const fields = req.currentUser.isAdmin
+      ? [...UserService.PROFILE_FIELDS, "password"]
+      : UserService.PROFILE_FIELDS;
+
+    const user = await UserService.updateUser(req.params.id, pick(req.body, fields));
+    res.status(200).json({ message: "Kullanıcı güncellendi", user });
   }
 
   static async deleteUser(req, res) {
-    try {
-      const { id } = req.params;
-      await UserService.deleteUser(id);
-      res.status(200).json({ message: "Kullanıcı silindi" });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: "Sunucu hatası" });
-    }
+    if (req.currentUser.isAdmin && String(req.currentUser.id) === String(req.params.id))
+      throw conflict("Yönetici hesabınızı buradan silemezsiniz");
+
+    await UserService.deleteUser(req.params.id);
+    res.status(200).json({ message: "Kullanıcı silindi" });
   }
 
   // Business logic endpoints
   static async earnAchievement(req, res) {
-    try {
-      const { id } = req.params;
-      const { achievementId } = req.body;
-      const result = await UserService.earnAchievement(id, achievementId);
-      res.status(200).json({
-        message: "Başarı kazanıldı",
-        achievement: result,
-      });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: "Sunucu hatası" });
-    }
+    if (!req.currentUser.isAdmin) throw forbidden("Başarılar yalnızca yöneticiler tarafından verilebilir");
+
+    const achievement = await UserService.earnAchievement(req.params.id, req.body?.achievementId);
+    res.status(200).json({ message: "Başarı kazanıldı", achievement });
   }
 
   static async getAchievements(req, res) {
-    try {
-      const { id } = req.params;
-      const achievements = await UserService.getAchievements(id);
-      res.status(200).json({ achievements });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: "Sunucu hatası" });
-    }
+    const achievements = await UserService.getAchievements(req.params.id);
+    res.status(200).json({ achievements });
   }
 
   static async enrollTraining(req, res) {
-    try {
-      const { id } = req.params;
-      const { trainingId } = req.body;
-      const result = await UserService.enrollTraining(id, trainingId);
-      res.status(201).json({
-        message: "Eğitime kayıt olundu",
-        enrollment: result,
-      });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: error.message || "Sunucu hatası" });
-    }
+    const enrollment = await UserService.enrollTraining(req.params.id, req.body?.trainingId);
+    res.status(201).json({ message: "Eğitime kayıt olundu", enrollment });
   }
 
   static async getUserEnrollments(req, res) {
-    try {
-      const { id } = req.params;
-      const enrollments = await UserService.getUserEnrollments(id);
-      res.status(200).json({ enrollments });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: "Sunucu hatası" });
-    }
+    const enrollments = await UserService.getUserEnrollments(req.params.id);
+    res.status(200).json({ enrollments });
   }
 
   static async completeTraining(req, res) {
-    try {
-      const { id } = req.params;
-      const { trainingId } = req.body;
-      const result = await UserService.completeTraining(id, trainingId);
-      res.status(200).json({
-        message: "Eğitim tamamlandı",
-        completion: result,
-      });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: error.message || "Sunucu hatası" });
-    }
+    const completion = await UserService.completeTraining(req.params.id, req.body?.trainingId);
+    res.status(200).json({ message: "Eğitim tamamlandı", completion });
   }
 
   static async startChapter(req, res) {
-    try {
-      const { id } = req.params;
-      const { chapterId } = req.body;
-      const result = await UserService.startChapter(id, chapterId);
-      res.status(200).json({
-        message: "Bölüm başlatıldı",
-        chapter: result,
-      });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: "Sunucu hatası" });
-    }
+    const chapter = await UserService.startChapter(req.params.id, req.body?.chapterId);
+    res.status(200).json({ message: "Bölüm başlatıldı", chapter });
   }
 
   static async completeChapter(req, res) {
-    try {
-      const { id } = req.params;
-      const { chapterId } = req.body;
-      const result = await UserService.completeChapter(id, chapterId);
-      res.status(200).json({
-        message: "Bölüm tamamlandı",
-        completion: result,
-      });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: "Sunucu hatası" });
-    }
+    const completion = await UserService.completeChapter(req.params.id, req.body?.chapterId);
+    res.status(200).json({ message: "Bölüm tamamlandı", completion });
   }
 
   static async getInstruction(req, res) {
-    try {
-      const { id, instructionId } = req.params;
-      const result = await UserService.getInstruction(id, instructionId);
-      res.status(200).json(result);
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: "Sunucu hatası" });
-    }
+    const result = await UserService.getInstruction(req.params.id, req.params.instructionId);
+    res.status(200).json(result);
   }
 
   static async getWriteUp(req, res) {
-    try {
-      const { id, writeUpId } = req.params;
-      const result = await UserService.getWriteUp(id, writeUpId);
-      res.status(200).json(result);
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: "Sunucu hatası" });
-    }
+    const result = await UserService.getWriteUp(req.params.id, req.params.writeUpId);
+    res.status(200).json(result);
+  }
+
+  static async getStats(req, res) {
+    const stats = await UserService.getStats(req.params.id);
+    res.status(200).json({ stats });
   }
 
   static async uploadProfileImage(req, res) {
     try {
-      const { id } = req.params;
-      const imageData = req.body;
-      const result = await UserService.uploadProfileImage(id, imageData);
-      res.status(200).json({
-        message: "Profil resmi yüklendi",
-        upload: result,
-      });
+      const upload = await UserService.uploadProfileImage(req.params.id, req.file);
+      res.status(200).json({ message: "Profil resmi yüklendi", upload });
     } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: "Sunucu hatası" });
+      // Multer already stored the file; do not keep it when the upload fails.
+      if (req.file) await fs.unlink(req.file.path).catch(() => {});
+      throw error;
     }
+  }
+
+  static async removeProfileImage(req, res) {
+    const user = await UserService.removeProfileImage(req.params.id);
+    res.status(200).json({ message: "Profil resmi kaldırıldı", user });
   }
 }
 
-module.exports = UserController;
+module.exports = wrapController(UserController);

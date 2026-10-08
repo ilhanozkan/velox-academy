@@ -1,57 +1,42 @@
 const express = require("express");
 
 const TrainingController = require("../controllers/trainingController");
-const authMiddleware = require("../utils/authMiddleware");
+const { requireAuth, requireAdmin } = require("../middleware/auth");
 const router = express.Router();
 
-router.get("/", authMiddleware, TrainingController.getAllTrainings);
+router.get("/", requireAuth, TrainingController.getAllTrainings);
 
-router.get("/:id", authMiddleware, TrainingController.getTrainingById);
+// Must be declared before "/:id", which used to swallow it ("enrollments"
+// was looked up as a training id and returned 404).
+router.get("/enrollments", requireAuth, TrainingController.getUserEnrollments);
 
-router.post("/", authMiddleware, TrainingController.createTraining);
+router.get("/:id", requireAuth, TrainingController.getTrainingById);
 
-router.put("/:id", authMiddleware, TrainingController.updateTraining);
+router.post("/", requireAdmin, TrainingController.createTraining);
 
-router.delete("/:id", authMiddleware, TrainingController.deleteTraining);
+router.put("/:id", requireAdmin, TrainingController.updateTraining);
+
+router.delete("/:id", requireAdmin, TrainingController.deleteTraining);
 
 // Business logic routes
-router.get("/:id/chapters", authMiddleware, TrainingController.getChapters);
+router.get("/:id/chapters", requireAuth, TrainingController.getChapters);
 
-router.get(
-  "/:id/chapters/:chapterId",
-  authMiddleware,
-  TrainingController.findChapter
-);
+router.get("/:id/chapters/:chapterId", requireAuth, TrainingController.findChapter);
 
-router.post(
-  "/:id/complete",
-  authMiddleware,
-  TrainingController.completeTraining
-);
+router.post("/:id/complete", requireAuth, TrainingController.completeTraining);
 
-router.post("/:id/enroll", authMiddleware, TrainingController.enrollUser);
+router.post("/:id/enroll", requireAuth, TrainingController.enrollUser);
 
-router.get(
-  "/:id/enrollments",
-  authMiddleware,
-  TrainingController.getTrainingEnrollments
-);
-
-router.get(
-  "/enrollments",
-  authMiddleware,
-  TrainingController.getUserEnrollments
-);
+router.get("/:id/enrollments", requireAdmin, TrainingController.getTrainingEnrollments);
 
 // Sandbox management routes
 // Get user's sandbox for a training
-router.get("/:id/sandbox", authMiddleware, TrainingController.getUserSandbox);
+router.get("/:id/sandbox", requireAuth, TrainingController.getUserSandbox);
+
+// Create (or retry/recreate) the user's sandbox for a training
+router.post("/:id/sandbox", requireAuth, TrainingController.createUserSandbox);
 
 // Delete user's sandbox for a training
-router.delete(
-  "/:id/sandbox",
-  authMiddleware,
-  TrainingController.deleteUserSandbox
-);
+router.delete("/:id/sandbox", requireAuth, TrainingController.deleteUserSandbox);
 
 module.exports = router;
