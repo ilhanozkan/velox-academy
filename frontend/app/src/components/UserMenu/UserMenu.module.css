@@ -2,8 +2,13 @@
   width: 100%;
   padding: var(--mantine-spacing-xs) var(--mantine-spacing-sm);
   border-radius: var(--mantine-radius-md);
-  background-color: var(--mantine-color-soft-0);
+  background-color: light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-6));
   color: var(--mantine-color-text);
+  transition: background-color 120ms ease;
+
+  &:hover {
+    background-color: light-dark(var(--mantine-color-gray-1), var(--mantine-color-dark-5));
+  }
 }
 
 .inner {

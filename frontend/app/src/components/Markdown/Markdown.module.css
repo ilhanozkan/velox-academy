@@ -55,8 +55,8 @@
 .blockquote {
   margin: 0 0 var(--mantine-spacing-md);
   padding: var(--mantine-spacing-xs) var(--mantine-spacing-md);
-  border-left: 4px solid var(--mantine-color-blue-5);
-  background-color: light-dark(var(--mantine-color-blue-0), var(--mantine-color-dark-6));
+  border-left: 4px solid var(--mantine-color-primary-4);
+  background-color: light-dark(var(--mantine-color-primary-0), var(--mantine-color-dark-6));
   border-radius: 0 var(--mantine-radius-sm) var(--mantine-radius-sm) 0;
 
   p:last-child {

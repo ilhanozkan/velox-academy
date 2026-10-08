@@ -1,22 +1,47 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { ActionIcon, Alert, Button, Group, Tabs, Text, Tooltip } from "@mantine/core";
+import {
+  ActionIcon,
+  Alert,
+  Button,
+  Group,
+  Loader,
+  Menu,
+  Progress,
+  Tabs,
+  Text,
+  Tooltip,
+  VisuallyHidden,
+} from "@mantine/core";
+import { modals } from "@mantine/modals";
 import { notifications } from "@mantine/notifications";
-import { IconArrowLeft, IconPlugConnectedX, IconTrophy } from "@tabler/icons-react";
+import {
+  IconArrowLeft,
+  IconBook2,
+  IconCode,
+  IconDotsVertical,
+  IconListDetails,
+  IconRefresh,
+  IconRestore,
+  IconTerminal2,
+  IconTrophy,
+} from "@tabler/icons-react";
 
 import api, { errorMessage } from "@/lib/api";
 import { achievementIcon } from "@/lib/achievementIcons";
 import { SocketProvider, useSocket } from "@/contexts/SocketContext";
+import useStoredState from "@/hooks/useStoredState";
 import useTrainingDetail from "./useTrainingDetail";
 import useSandbox from "./useSandbox";
 import { applyCompletion, flattenInstructions, initialInstructionId } from "./curriculum";
 import InstructionsPanel from "./InstructionsPanel";
 import Playground from "./Playground";
 import Results from "./Results";
+import Splitter from "./Splitter";
 import { WorkspaceError, WorkspaceLoading } from "./WorkspaceStatus";
 import classes from "./Workspace.module.css";
 
@@ -106,18 +131,58 @@ const notifyCompletion = (completion) => {
     notifications.show({ color: "teal", title: "Bölüm tamamlandı", message: "Harika gidiyorsunuz!" });
 };
 
+const SIDE_RATIO = { default: 0.45, min: 0.25, max: 0.7, step: 0.02 };
+const clampRatio = (ratio) => Math.min(SIDE_RATIO.max, Math.max(SIDE_RATIO.min, ratio));
+const sanitizeRatio = (value) => (Number.isFinite(value) ? clampRatio(value) : null);
+
+const MOBILE_VIEWS = [
+  { value: "instructions", label: "Yönergeler", icon: IconBook2 },
+  { value: "code", label: "Kod", icon: IconCode },
+  { value: "results", label: "Çıktılar", icon: IconListDetails },
+  { value: "terminal", label: "Terminal", icon: IconTerminal2 },
+];
+
+const ConnectionStatus = ({ connected }) => (
+  <span className={classes.connection} data-connected={connected || undefined} role="status">
+    <span className={classes.connectionDot} aria-hidden />
+    {connected ? "Bağlı" : "Yeniden bağlanıyor…"}
+  </span>
+);
+
+/** Screen reader announcement for runs. */
+const runAnnouncement = (running, result) => {
+  if (running) return "Dosya çalıştırılıyor.";
+  if (!result) return "";
+  const { data } = result;
+  if (data && typeof data === "object" && !Array.isArray(data) && (data.error || data.message))
+    return "Çalıştırma hatayla sonuçlandı. Ayrıntılar Çıktılar sekmesinde.";
+  if (Array.isArray(data)) return `Sorgu ${data.length} satır döndürdü.`;
+  return "Çalıştırma tamamlandı.";
+};
+
 const WorkspaceContent = ({ training, setTraining, sandboxAvailable, sandboxNotice, onRecreate }) => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { isConnected, connectError, reconnect } = useSocket();
   const { result, running, run } = useRunner();
   const [tab, setTab] = useState("instructions");
+  // Small screens show one pane at a time; this selects the editor.
+  const [showCode, setShowCode] = useState(false);
+  const [sideRatio, setSideRatio] = useStoredState(
+    "velox.workspace.sideRatio",
+    SIDE_RATIO.default,
+    sanitizeRatio
+  );
+  const bodyRef = useRef(null);
   const [completing, setCompleting] = useState(false);
   const [currentId, setCurrentId] = useState(() =>
     initialInstructionId(training, searchParams.get("adim"))
   );
   const hasConnected = useRef(false);
   if (isConnected) hasConnected.current = true;
+
+  const steps = useMemo(() => flattenInstructions(training), [training]);
+  const stepIndex = steps.findIndex((step) => step.id === currentId);
 
   const selectInstruction = useCallback(
     (id) => {
@@ -140,7 +205,6 @@ const WorkspaceContent = ({ training, setTraining, sandboxAvailable, sandboxNoti
       if (completed) {
         notifyCompletion(completion);
         // Move on to the next step.
-        const steps = flattenInstructions(training);
         const next = steps[steps.findIndex((s) => s.id === step.id) + 1];
         if (next) selectInstruction(next.id);
       }
@@ -154,10 +218,38 @@ const WorkspaceContent = ({ training, setTraining, sandboxAvailable, sandboxNoti
   const handleRun = useCallback(
     (path) => {
       setTab("results");
+      setShowCode(false);
       run(path);
     },
     [run]
   );
+
+  const selectMobileView = (view) => {
+    setShowCode(view === "code");
+    if (view !== "code") setTab(view);
+  };
+
+  const confirmRecreate = () =>
+    modals.openConfirmModal({
+      title: "Ortam sıfırlansın mı?",
+      children: (
+        <Text size="sm">
+          Sanal makineniz silinip baştan oluşturulur. Çalışma alanındaki dosyalarda yaptığınız değişiklikler
+          kaybolur; eğitimdeki ilerlemeniz korunur.
+        </Text>
+      ),
+      labels: { confirm: "Sıfırla", cancel: "Vazgeç" },
+      confirmProps: { color: "red" },
+      onConfirm: onRecreate,
+    });
+
+  const resizeSide = (clientX) => {
+    const rect = bodyRef.current?.getBoundingClientRect();
+    if (!rect?.width) return;
+    // Same limit as the CSS max-width: 20rem (320 px) for the editor side.
+    const max = Math.max(SIDE_RATIO.min, 1 - 320 / rect.width);
+    setSideRatio(Math.min(max, clampRatio((rect.right - clientX) / rect.width)));
+  };
 
   if (sandboxAvailable && connectError)
     return (
@@ -182,47 +274,145 @@ const WorkspaceContent = ({ training, setTraining, sandboxAvailable, sandboxNoti
     />
   );
 
+  const { percent } = training.progress;
+  const mobileView = showCode ? "code" : tab;
+
   return (
     <div className={classes.workspace}>
       <header className={classes.header}>
-        <Group gap="xs" wrap="nowrap">
+        <Group gap="xs" wrap="nowrap" miw={0}>
           <Tooltip label="Eğitimlere dön">
-            <ActionIcon component={Link} href="/egitimler" variant="subtle" color="gray" aria-label="Eğitimlere dön">
+            <ActionIcon
+              component={Link}
+              href="/egitimler"
+              variant="subtle"
+              color="navy.1"
+              className={classes.headerIcon}
+              aria-label="Eğitimlere dön"
+            >
               <IconArrowLeft size={18} />
             </ActionIcon>
           </Tooltip>
-          <Text fw={600} c="white" truncate>
-            {training.name}
-          </Text>
+          <div className={classes.title}>
+            <Text component="h1" fw={600} c="white" truncate fz="sm" lh={1.3}>
+              {training.name}
+            </Text>
+            {stepIndex >= 0 ? (
+              <Text fz="xs" c="navy.2" truncate lh={1.3}>
+                Adım {stepIndex + 1} / {steps.length} · {steps[stepIndex].name}
+              </Text>
+            ) : null}
+          </div>
         </Group>
-        {sandboxAvailable && !isConnected ? (
-          <Group gap={6} c="yellow.4">
-            <IconPlugConnectedX size={16} />
-            <Text size="sm">Bağlantı koptu, yeniden bağlanılıyor…</Text>
+
+        <Group gap="md" wrap="nowrap">
+          <Group gap={8} wrap="nowrap" visibleFrom="sm">
+            <Progress
+              value={percent}
+              w={110}
+              size="sm"
+              color={percent === 100 ? "teal.5" : "primary.3"}
+              className={classes.headerProgress}
+              aria-label="Eğitim ilerlemesi"
+            />
+            <Text fz="xs" fw={600} c="white">
+              %{percent}
+            </Text>
           </Group>
-        ) : null}
+
+          {sandboxAvailable ? <ConnectionStatus connected={isConnected} /> : null}
+
+          {sandboxAvailable ? (
+            <Menu position="bottom-end" withinPortal>
+              <Menu.Target>
+                <ActionIcon variant="subtle" color="navy.1" className={classes.headerIcon} aria-label="Çalışma alanı menüsü">
+                  <IconDotsVertical size={18} />
+                </ActionIcon>
+              </Menu.Target>
+              <Menu.Dropdown>
+                <Menu.Item leftSection={<IconRefresh size={16} />} onClick={reconnect}>
+                  Yeniden bağlan
+                </Menu.Item>
+                <Menu.Item color="red" leftSection={<IconRestore size={16} />} onClick={confirmRecreate}>
+                  Ortamı sıfırla
+                </Menu.Item>
+              </Menu.Dropdown>
+            </Menu>
+          ) : null}
+        </Group>
       </header>
 
       {sandboxAvailable ? (
-        <div className={classes.body}>
-          <div className={classes.editorPane}>
-            <Playground onRun={handleRun} running={running} />
+        <>
+          <div
+            className={classes.body}
+            ref={bodyRef}
+            data-view={mobileView}
+            style={{ "--side-size": `${(sideRatio * 100).toFixed(2)}%` }}
+          >
+            <div className={classes.editorPane}>
+              <Playground onRun={handleRun} running={running} />
+            </div>
+            <Splitter
+              className={classes.sideSplitter}
+              label="Yönerge panelinin genişliği"
+              value={sideRatio * 100}
+              min={SIDE_RATIO.min * 100}
+              max={SIDE_RATIO.max * 100}
+              onDrag={resizeSide}
+              // Moving the handle left makes the side pane wider.
+              onStep={(direction) => setSideRatio((ratio) => clampRatio(ratio - direction * SIDE_RATIO.step))}
+              onReset={() => setSideRatio(SIDE_RATIO.default)}
+            />
+            <Tabs
+              value={tab}
+              onChange={setTab}
+              keepMounted
+              className={classes.sidePane}
+              classNames={{ list: classes.tabsList, panel: classes.tabPanel, tab: classes.tab }}
+            >
+              <Tabs.List>
+                <Tabs.Tab value="instructions" leftSection={<IconBook2 size={15} />}>
+                  Yönergeler
+                </Tabs.Tab>
+                <Tabs.Tab value="results" leftSection={<IconListDetails size={15} />}>
+                  Çıktılar
+                </Tabs.Tab>
+                <Tabs.Tab value="terminal" leftSection={<IconTerminal2 size={15} />}>
+                  Terminal
+                </Tabs.Tab>
+              </Tabs.List>
+              <Tabs.Panel value="instructions">{instructions}</Tabs.Panel>
+              <Tabs.Panel value="results">
+                <Results result={result} running={running} />
+              </Tabs.Panel>
+              <Tabs.Panel value="terminal">
+                <Terminal active={tab === "terminal" && !showCode} />
+              </Tabs.Panel>
+            </Tabs>
           </div>
-          <Tabs value={tab} onChange={setTab} keepMounted className={classes.sidePane} classNames={{ list: classes.tabsList, panel: classes.tabPanel, tab: classes.tab }}>
-            <Tabs.List>
-              <Tabs.Tab value="instructions">Yönergeler</Tabs.Tab>
-              <Tabs.Tab value="results">Çıktılar</Tabs.Tab>
-              <Tabs.Tab value="terminal">Terminal</Tabs.Tab>
-            </Tabs.List>
-            <Tabs.Panel value="instructions">{instructions}</Tabs.Panel>
-            <Tabs.Panel value="results">
-              <Results result={result} running={running} />
-            </Tabs.Panel>
-            <Tabs.Panel value="terminal">
-              <Terminal active={tab === "terminal"} />
-            </Tabs.Panel>
-          </Tabs>
-        </div>
+
+          <nav className={classes.mobileNav} aria-label="Çalışma alanı bölümleri">
+            {MOBILE_VIEWS.map(({ value, label, icon: Icon }) => (
+              <button
+                key={value}
+                type="button"
+                className={classes.mobileNavItem}
+                data-active={mobileView === value || undefined}
+                aria-pressed={mobileView === value}
+                onClick={() => selectMobileView(value)}
+              >
+                <Icon size={20} aria-hidden />
+                <span>{label}</span>
+                {value === "results" && running ? <Loader size={10} color="primary.4" className={classes.mobileNavBusy} /> : null}
+              </button>
+            ))}
+          </nav>
+
+          <VisuallyHidden role="status" aria-live="polite">
+            {runAnnouncement(running, result)}
+          </VisuallyHidden>
+        </>
       ) : (
         <div className={classes.instructionsOnly}>
           {sandboxNotice ? (

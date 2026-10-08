@@ -13,10 +13,16 @@ const DashboardShell = ({ children }) => {
 
   return (
     <AppShell
+      // Tinted page background so white cards stand out.
+      styles={{ main: { backgroundColor: "var(--mantine-color-gray-0)" } }}
       header={{ height: { base: 56, sm: 0 } }}
       navbar={{ width: 240, breakpoint: "sm", collapsed: { mobile: !opened } }}
       padding="md"
     >
+      <a href="#main-content" className="skip-link">
+        İçeriğe geç
+      </a>
+
       <AppShell.Header hiddenFrom="sm" px="md">
         <Group h="100%" justify="space-between">
           <VeloxLogo style={{ height: 28, width: "auto" }} aria-label="Velox Academy" />
@@ -28,7 +34,9 @@ const DashboardShell = ({ children }) => {
         <NavBar onNavigate={close} />
       </AppShell.Navbar>
 
-      <AppShell.Main>{children}</AppShell.Main>
+      <AppShell.Main id="main-content" tabIndex={-1}>
+        {children}
+      </AppShell.Main>
     </AppShell>
   );
 };

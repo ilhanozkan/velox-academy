@@ -24,4 +24,15 @@
   padding: var(--mantine-spacing-xs) var(--mantine-spacing-md);
   border-top: 1px solid var(--mantine-color-gray-2);
   background-color: var(--mantine-color-white);
+  container-type: inline-size;
+}
+
+@container (max-width: 26rem) {
+  .navLabel {
+    display: none;
+  }
+
+  .navSection {
+    margin: 0;
+  }
 }

@@ -1,25 +1,136 @@
 .page {
   min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(22rem, 5fr) 7fr;
+  background-color: var(--mantine-color-white);
+
+  @mixin smaller-than $mantine-breakpoint-md {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Brand panel (desktop only) */
+.brand {
+  position: relative;
   display: flex;
-  align-items: flex-start;
+  flex-direction: column;
+  gap: 2.5rem;
+  padding: 2.5rem 3rem;
+  overflow: hidden;
+  color: var(--mantine-color-white);
+  background:
+    radial-gradient(circle at 85% 10%, rgba(117, 132, 212, 0.35), transparent 45%),
+    radial-gradient(circle at 10% 90%, rgba(75, 92, 192, 0.3), transparent 50%),
+    linear-gradient(160deg, var(--mantine-color-primary-9) 0%, var(--mantine-color-primary-6) 100%);
+
+  @mixin smaller-than $mantine-breakpoint-md {
+    display: none;
+  }
+}
+
+.brandLogo {
+  width: 10rem;
+  height: auto;
+
+  path {
+    fill: var(--mantine-color-white);
+  }
+}
+
+.brandBody {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
   justify-content: center;
-  padding: 2.5rem 1rem;
-  background-color: #fafafa;
+  max-width: 28rem;
+}
+
+.brandTitle {
+  color: var(--mantine-color-white);
+  font-size: 1.9rem;
+  line-height: 1.25;
+}
+
+.features {
+  list-style: none;
+  margin: 2rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.feature {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.featureIcon {
+  flex-shrink: 0;
+  background-color: rgba(255, 255, 255, 0.1);
+  color: var(--mantine-color-primary-2);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.featureText {
+  color: var(--mantine-color-primary-1);
+  opacity: 0.85;
+}
+
+/* Form side */
+.formSide {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1.5rem;
+
+  @mixin smaller-than $mantine-breakpoint-md {
+    align-items: flex-start;
+    padding: 2rem 1rem;
+    background-color: var(--mantine-color-gray-0);
+  }
+}
+
+.formContainer {
+  width: 100%;
+  max-width: 26rem;
+}
+
+.mobileLogo {
+  display: none;
+  width: 9rem;
+  height: auto;
+  margin: 0 auto 2rem;
+
+  @mixin smaller-than $mantine-breakpoint-md {
+    display: block;
+  }
 }
 
 .title {
-  font-weight: 700;
-  font-size: 1.6rem;
-  color: var(--mantine-color-brandDark-6);
+  font-size: 1.75rem;
+  color: var(--mantine-color-primary-9);
+
+  @mixin smaller-than $mantine-breakpoint-md {
+    text-align: center;
+  }
 }
 
-.logo {
-  width: 12rem;
-  height: auto;
+.subtitle {
+  @mixin smaller-than $mantine-breakpoint-md {
+    text-align: center;
+  }
 }
 
-.logoContainer {
-  display: flex;
-  justify-content: center;
-  margin-bottom: 1.25rem;
+.form {
+  margin-top: 2rem;
+
+  @mixin smaller-than $mantine-breakpoint-md {
+    padding: 1.25rem;
+    border: 1px solid var(--mantine-color-gray-3);
+    border-radius: var(--mantine-radius-md);
+    background-color: var(--mantine-color-white);
+    box-shadow: var(--mantine-shadow-sm);
+  }
 }
