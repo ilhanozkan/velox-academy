@@ -21,7 +21,7 @@ export const NothingFoundBackground = () => {
             className={classes.description}
           >
             Açmaya çalıştığınız sayfa mevcut değil. Adresi yanlış yazmış
-            olabilirsiniz veya sayfa başka bir URL'ye taşınmış olabilir.
+            olabilirsiniz veya sayfa başka bir URL&apos;ye taşınmış olabilir.
           </Text>
           <Group justify="center">
             <Button

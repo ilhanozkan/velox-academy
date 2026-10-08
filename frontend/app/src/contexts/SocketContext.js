@@ -1,60 +1,70 @@
 "use client";
 
-import { createContext, useContext, useEffect, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { io } from "socket.io-client";
 
-const SocketContext = createContext();
+const SocketContext = createContext(null);
 
 export const useSocket = () => {
   const context = useContext(SocketContext);
 
-  if (!context)
-    throw new Error("useSocket must be used within a SocketProvider");
+  if (!context) throw new Error("useSocket must be used within a SocketProvider");
 
   return context;
 };
 
-export const SocketProvider = ({ children, url }) => {
+// How long to wait for the first connection before reporting a failure.
+const CONNECT_TIMEOUT_MS = 15000;
+
+/**
+ * Connection to the learner's sandbox. The sandbox requires the access token
+ * returned by the API (socket.io `auth.token`).
+ */
+export const SocketProvider = ({ children, url, token }) => {
   const [socket, setSocket] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
-  const socketRef = useRef(null);
+  const [connectError, setConnectError] = useState(null);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
-    // Clean up existing socket if URL changes
-    if (socketRef.current) {
-      socketRef.current.disconnect();
-      setSocket(null);
-      setIsConnected(false);
-    }
-
     if (!url) return;
 
-    // Create new socket connection
-    const newSocket = io(url);
-    socketRef.current = newSocket;
+    setConnectError(null);
+    // socket.io keeps retrying (with backoff) after a drop: a limit used to
+    // leave the workspace "reconnecting" forever after a long sleep.
+    const newSocket = io(url, { auth: { token } });
     setSocket(newSocket);
 
+    const timeout = setTimeout(() => {
+      if (!newSocket.connected) setConnectError("Sanal makineye bağlanılamadı.");
+    }, CONNECT_TIMEOUT_MS);
+
     newSocket.on("connect", () => {
+      clearTimeout(timeout);
       setIsConnected(true);
+      setConnectError(null);
     });
-
-    newSocket.on("disconnect", () => {
-      setIsConnected(false);
-    });
-
+    newSocket.on("disconnect", () => setIsConnected(false));
     newSocket.on("connect_error", (error) => {
-      console.error("SocketContext - Socket connection error:", error);
-      setIsConnected(false);
+      // A wrong token is final; network errors are retried by socket.io.
+      if (error?.message === "unauthorized") {
+        clearTimeout(timeout);
+        setConnectError("Sanal makine erişim anahtarını kabul etmedi.");
+      }
     });
 
     return () => {
+      clearTimeout(timeout);
       newSocket.disconnect();
+      setSocket(null);
       setIsConnected(false);
     };
-  }, [url]);
+  }, [url, token, attempt]);
+
+  const reconnect = useCallback(() => setAttempt((n) => n + 1), []);
 
   return (
-    <SocketContext.Provider value={{ socket, isConnected }}>
+    <SocketContext.Provider value={{ socket, isConnected, connectError, reconnect, url, token }}>
       {children}
     </SocketContext.Provider>
   );

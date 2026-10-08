@@ -20,7 +20,7 @@ The project consists of three main components:
 - **Sandbox Environments**: Real-time virtual machines powered by Google Cloud Platform
 - **Course Management**: Organized categories, trainings, chapters, and achievements
 - **User Management**: Authentication, progress tracking, and user sandboxes
-- **Admin Dashboard**: Content management and user administration
+- **Admin Dashboard**: Platform statistics, user management (roles, blocking) and a curriculum editor with markdown preview and achievements
 - **Real-time Terminal**: In-browser terminal access to virtual environments
 
 ## 📁 Project Structure
@@ -37,7 +37,11 @@ velox-academy/
 │   └── umlDiagram.puml  # System architecture diagram
 ├── frontend/         # Next.js React application
 │   └── app/          # Next.js app directory
-│       └── src/      # Source code
+│       └── src/
+│           ├── app/          # Routes: (auth) login/register, (dashboard) catalog,
+│           │                 # statistics, settings, admin; (workspace) training
+│           ├── components/   # UI components (Workspace, Admin, Catalog, ...)
+│           └── lib/          # API client, Redux store, helpers
 └── vm-image/         # Virtual machine service
     ├── database/     # VM database setup
     └── user/         # User environment files
@@ -195,14 +199,18 @@ LOCAL_SANDBOX_URL=http://localhost:9000
 `.env` is not committed: the previously committed `JWT_SECRET` must be
 considered public, so set a new one in every deployed environment.
 
-**Frontend (`frontend/app/.env.local`)**:
+**Frontend** — development defaults are committed in
+`frontend/app/.env.development`; override them in `frontend/app/.env.local`
+(not committed, see `frontend/app/.env.example`):
 
 ```env
 NEXT_PUBLIC_BASE_URL=http://localhost:8080/api
 NEXT_PUBLIC_IMAGE_SERVER=http://localhost:8080/static
-# API URL for server-side requests (Docker container to container)
-NEXT_PUBLIC_API_URL=http://app:5001
 ```
+
+The code editor (Monaco) is served by the app itself from `public/monaco`,
+copied from `node_modules` before `dev` and `build`, so it also works on
+networks that block public CDNs.
 
 ### Google Cloud Setup
 
@@ -222,6 +230,11 @@ Each VM receives a random access token through the `velox-sandbox-token`
 instance metadata key, and the sandbox service refuses connections without it.
 Rebuild the image from the current `vm-image/` code to enable this check (and
 do not set `ALLOW_NO_TOKEN` on VMs).
+
+The browser connects to each VM directly at `http://<external-ip>:9000`. If the
+frontend is served over HTTPS, browsers block these plain-HTTP connections
+(mixed content): put the sandboxes behind a TLS-terminating proxy or load
+balancer and return its `https://` address as the sandbox URL.
 
 ## 📊 Database Schema
 
@@ -287,7 +300,7 @@ The backend provides RESTful APIs for the following areas; see
 - Structured courses with categories and chapters
 - Progressive learning with step-by-step instructions
 - Achievement system for motivation
-- Progress tracking and analytics
+- Progress tracking and a personal statistics page
 
 ### Sandbox Environments
 
@@ -299,8 +312,8 @@ The backend provides RESTful APIs for the following areas; see
 ### User Experience
 
 - Modern, responsive UI with Mantine components
-- Code editor with syntax highlighting
-- Real-time collaboration features
+- Code editor with syntax highlighting, autosave and open-file tabs
+- Query results as tables, readable program and SQL errors
 
 ---
 

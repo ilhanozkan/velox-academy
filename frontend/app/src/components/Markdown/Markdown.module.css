@@ -1,0 +1,65 @@
+.markdown {
+  line-height: 1.65;
+  font-size: var(--mantine-font-size-sm);
+
+  p,
+  ul,
+  ol {
+    margin-bottom: var(--mantine-spacing-sm);
+  }
+
+  ul,
+  ol {
+    padding-left: 1.25rem;
+  }
+
+  li + li {
+    margin-top: 0.25rem;
+  }
+}
+
+.heading {
+  margin-top: var(--mantine-spacing-lg);
+  margin-bottom: var(--mantine-spacing-xs);
+
+  &:first-child {
+    margin-top: 0;
+  }
+}
+
+.inlineCode {
+  font-family: var(--mantine-font-family-monospace);
+  font-size: 0.85em;
+  padding: 0.1rem 0.35rem;
+  border-radius: var(--mantine-radius-sm);
+  background-color: light-dark(var(--mantine-color-gray-1), var(--mantine-color-dark-5));
+}
+
+.codeBlock {
+  position: relative;
+  margin-bottom: var(--mantine-spacing-md);
+  font-size: 0.85rem;
+}
+
+.copyButton {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 1;
+}
+
+.table {
+  margin-bottom: var(--mantine-spacing-md);
+}
+
+.blockquote {
+  margin: 0 0 var(--mantine-spacing-md);
+  padding: var(--mantine-spacing-xs) var(--mantine-spacing-md);
+  border-left: 4px solid var(--mantine-color-blue-5);
+  background-color: light-dark(var(--mantine-color-blue-0), var(--mantine-color-dark-6));
+  border-radius: 0 var(--mantine-radius-sm) var(--mantine-radius-sm) 0;
+
+  p:last-child {
+    margin-bottom: 0;
+  }
+}

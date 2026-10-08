@@ -1,0 +1,28 @@
+.panel {
+  padding: var(--mantine-spacing-md);
+}
+
+.tableScroll {
+  max-height: calc(100vh - 12rem);
+}
+
+.table {
+  font-size: var(--mantine-font-size-sm);
+  white-space: nowrap;
+}
+
+.output,
+.errorText {
+  margin: 0;
+  font-family: var(--mantine-font-family-monospace);
+  font-size: var(--mantine-font-size-sm);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.output {
+  padding: var(--mantine-spacing-sm);
+  border-radius: var(--mantine-radius-sm);
+  background-color: #1e1e1e;
+  color: #e5e5e5;
+}
