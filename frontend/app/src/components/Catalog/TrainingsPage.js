@@ -76,21 +76,26 @@ const TrainingsPage = () => {
     return [...names].map(([value, label]) => ({ value, label })).sort((a, b) => a.label.localeCompare(b.label, "tr"));
   }, [trainings]);
 
-  const counts = useMemo(() => {
-    const result = { all: trainings.length, enrolled: 0, completed: 0, new: 0 };
-    for (const training of trainings) result[trainingStatus(training)] += 1;
-    return result;
-  }, [trainings]);
-
-  const visible = useMemo(
+  // Search and category first; the status counts describe that list.
+  const matching = useMemo(
     () =>
       trainings.filter(
         (training) =>
-          (status === "all" || trainingStatus(training) === status) &&
           (!category || String(training.category?.id) === category) &&
           matchesSearch(query, [training.name, training.description, training.category?.name])
       ),
-    [trainings, status, category, query]
+    [trainings, category, query]
+  );
+
+  const counts = useMemo(() => {
+    const result = { all: matching.length, enrolled: 0, completed: 0, new: 0 };
+    for (const training of matching) result[trainingStatus(training)] += 1;
+    return result;
+  }, [matching]);
+
+  const visible = useMemo(
+    () => (status === "all" ? matching : matching.filter((training) => trainingStatus(training) === status)),
+    [matching, status]
   );
 
   // The training in progress the learner is furthest along in.
@@ -134,6 +139,8 @@ const TrainingsPage = () => {
             placeholder="Eğitim ara…"
             aria-label="Eğitim ara"
             leftSection={<IconSearch size={16} aria-hidden />}
+            // Mantine ignores clicks on the right section by default.
+            rightSectionPointerEvents="all"
             value={query}
             onChange={(event) => setQuery(event.currentTarget.value)}
             rightSection={

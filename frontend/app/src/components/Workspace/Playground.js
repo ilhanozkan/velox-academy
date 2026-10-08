@@ -27,6 +27,7 @@ const ACK_TIMEOUT_MS = 3000;
 
 const TREE_WIDTH = { default: 200, min: 140, max: 420, step: 16 };
 const clampTreeWidth = (width) => Math.min(TREE_WIDTH.max, Math.max(TREE_WIDTH.min, Math.round(width)));
+const sanitizeTreeWidth = (value) => (Number.isFinite(value) ? clampTreeWidth(value) : null);
 
 const fileName = (path) => path.split("/").pop();
 
@@ -57,7 +58,7 @@ const SaveStatus = ({ file }) => {
   if (file.current !== file.saved)
     return (
       <span className={classes.statusItem}>
-        <Loader size={10} color="gray" aria-hidden /> Kaydediliyor…
+        <Loader size={10} color="navy.2" aria-hidden /> Kaydediliyor…
       </span>
     );
   return (
@@ -76,7 +77,11 @@ const Playground = ({ onRun, running }) => {
   const { socket, isConnected } = useSocket();
   const sandboxFetch = useSandboxFetch();
   const rootRef = useRef(null);
-  const [treeWidth, setTreeWidth] = useStoredState("velox.workspace.treeWidth", TREE_WIDTH.default);
+  const [treeWidth, setTreeWidth] = useStoredState(
+    "velox.workspace.treeWidth",
+    TREE_WIDTH.default,
+    sanitizeTreeWidth
+  );
   const [filesOpened, filesDrawer] = useDisclosure(false);
   const [mod] = useState(modKeyLabel);
 
@@ -219,6 +224,13 @@ const Playground = ({ onRun, running }) => {
     [socket]
   );
 
+  // Timers call the latest `save`: after a reconnect the one captured when
+  // typing would still use the old, closed socket.
+  const saveRef = useRef(save);
+  useEffect(() => {
+    saveRef.current = save;
+  }, [save]);
+
   const handleChange = (content) => {
     const path = activeFile;
     setFiles((current) => ({ ...current, [path]: { ...current[path], current: content } }));
@@ -227,7 +239,7 @@ const Playground = ({ onRun, running }) => {
     pendingSaves.current[path] = content;
     saveTimers.current[path] = setTimeout(() => {
       delete pendingSaves.current[path];
-      save(path, content);
+      saveRef.current(path, content);
     }, SAVE_DELAY_MS);
   };
 
@@ -281,23 +293,51 @@ const Playground = ({ onRun, running }) => {
     return true;
   }, [activeFile, files, save]);
 
+  // A run starts with a save that can wait up to ACK_TIMEOUT_MS for the
+  // sandbox; `busy` (a ref, so repeated clicks and shortcuts see it at once)
+  // stays set until that run has finished.
+  const busyRef = useRef(false);
+  const runToken = useRef(0);
+  const [starting, setStarting] = useState(false);
+  const wasRunning = useRef(false);
+  useEffect(() => {
+    if (running) wasRunning.current = true;
+    else if (wasRunning.current) {
+      wasRunning.current = false;
+      busyRef.current = false;
+    }
+  }, [running]);
+
   // Save first, then run; the old button could run the previous version of a
   // file edited less than a second ago. If the save fails, running would show
   // the output of the old version, so stop.
   const run = useCallback(async () => {
-    if (!activeFile || !socket || !isConnected || running) return;
-    if (!(await saveNow())) {
-      notifications.show({
-        color: "red",
-        title: "Dosya kaydedilemedi",
-        message: "Değişiklikleriniz sanal makineye kaydedilemediği için dosya çalıştırılmadı. Bağlantıyı kontrol edip tekrar deneyin.",
-      });
-      return;
+    if (!activeFile || !socket || !isConnected || running || busyRef.current) return;
+    busyRef.current = true;
+    const token = ++runToken.current;
+    setStarting(true);
+    try {
+      if (!(await saveNow())) {
+        busyRef.current = false;
+        notifications.show({
+          color: "red",
+          title: "Dosya kaydedilemedi",
+          message: "Değişiklikleriniz sanal makineye kaydedilemediği için dosya çalıştırılmadı. Bağlantıyı kontrol edip tekrar deneyin.",
+        });
+        return;
+      }
+      onRun(activeFile);
+      // Fallback if `running` never showed as true (start and result in one
+      // render): do not leave the run button blocked.
+      setTimeout(() => {
+        if (runToken.current === token && !wasRunning.current) busyRef.current = false;
+      }, 1000);
+    } finally {
+      setStarting(false);
     }
-    onRun(activeFile);
   }, [activeFile, isConnected, onRun, running, saveNow, socket]);
 
-  // Shortcuts read the latest callbacks through refs: Monaco commands are
+  // Shortcuts read the latest callbacks through refs: Monaco actions are
   // registered once per editor.
   const runRef = useRef(run);
   const saveNowRef = useRef(saveNow);
@@ -306,27 +346,45 @@ const Playground = ({ onRun, running }) => {
     saveNowRef.current = saveNow;
   });
 
+  // Actions (unlike addCommand) can be disposed: the editor is recreated
+  // when a file is loading, and each one would leave keybindings behind.
   const handleEditorMount = useCallback((editor, monaco) => {
     monacoRef.current = monaco;
-    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => runRef.current());
-    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => saveNowRef.current());
+    const actions = [
+      editor.addAction({
+        id: "velox.run",
+        label: "Kaydet ve çalıştır",
+        keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter],
+        run: () => runRef.current(),
+      }),
+      editor.addAction({
+        id: "velox.save",
+        label: "Kaydet",
+        keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS],
+        run: () => saveNowRef.current(),
+      }),
+    ];
+    editor.onDidDispose(() => actions.forEach((action) => action.dispose()));
   }, []);
 
   // The same shortcuts outside the editor (instructions, results). The
-  // terminal keeps Ctrl+S / Ctrl+Enter for the shell.
+  // terminal keeps Ctrl+S / Ctrl+Enter for the shell; dialogs, links and form
+  // fields keep their own meaning (Ctrl+Enter on a link opens a new tab).
   useEffect(() => {
     const onKeyDown = (event) => {
       if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
       const target = event.target instanceof Element ? event.target : null;
-      if (target?.closest(".xterm, .monaco-editor")) return;
+      if (target?.closest(".xterm, .monaco-editor, [role=dialog], a[href], input, textarea, select, [contenteditable]"))
+        return;
+      const isRun = event.key === "Enter";
+      const isSave = event.key === "s" || event.key === "S";
+      if (!isRun && !isSave) return;
 
-      if (event.key === "Enter") {
-        event.preventDefault();
-        runRef.current();
-      } else if (event.key === "s" || event.key === "S") {
-        event.preventDefault();
-        saveNowRef.current();
-      }
+      event.preventDefault();
+      // Holding the keys down must not start a run per repeated keydown.
+      if (event.repeat) return;
+      if (isRun) runRef.current();
+      else saveNowRef.current();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
@@ -346,8 +404,10 @@ const Playground = ({ onRun, running }) => {
   };
 
   const resizeTree = (clientX) => {
-    const left = rootRef.current?.getBoundingClientRect().left ?? 0;
-    setTreeWidth(clampTreeWidth(clientX - left));
+    const rect = rootRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    // Same limit as the CSS max-width: the editor keeps 16rem (256 px).
+    setTreeWidth(Math.min(clampTreeWidth(clientX - rect.left), Math.max(TREE_WIDTH.min, rect.width - 256)));
   };
 
   const active = activeFile ? files[activeFile] : null;
@@ -359,7 +419,7 @@ const Playground = ({ onRun, running }) => {
       <FileTree tree={tree} selected={activeFile} onSelect={onSelect} showTitle={showTitle} />
     ) : (
       <Center h={120}>
-        <Loader size="sm" color="gray" />
+        <Loader size="sm" color="navy.2" />
       </Center>
     );
 
@@ -384,7 +444,7 @@ const Playground = ({ onRun, running }) => {
           <ActionIcon
             hiddenFrom="sm"
             variant="subtle"
-            color="gray"
+            color="navy.1"
             size="lg"
             radius={0}
             className={classes.filesButton}
@@ -414,7 +474,7 @@ const Playground = ({ onRun, running }) => {
                   <ActionIcon
                     size="xs"
                     variant="transparent"
-                    color="gray"
+                    color="navy.2"
                     onClick={() => closeFile(path)}
                     aria-label={`${fileName(path)} dosyasını kapat`}
                   >
@@ -439,7 +499,7 @@ const Playground = ({ onRun, running }) => {
               color="teal"
               leftSection={<IconPlayerPlay size={14} />}
               onClick={run}
-              loading={running}
+              loading={running || starting}
               disabled={!canRun}
             >
               Çalıştır
@@ -465,7 +525,7 @@ const Playground = ({ onRun, running }) => {
             )
           ) : active?.loading ? (
             <Center h="100%">
-              <Loader color="gray" size="sm" />
+              <Loader color="navy.2" size="sm" />
             </Center>
           ) : (
             <Center h="100%" px="md">

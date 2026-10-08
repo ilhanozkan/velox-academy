@@ -51,7 +51,7 @@ const CodeEditor = ({ language, value, onChange, path, fileName, onMount }) => (
     onMount={onMount}
     loading={
       <Center h="100%">
-        <Loader color="gray" />
+        <Loader color="navy.2" />
       </Center>
     }
     options={{

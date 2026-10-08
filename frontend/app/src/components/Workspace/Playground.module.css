@@ -8,14 +8,16 @@
 .sidebar {
   flex-shrink: 0;
   min-width: 0;
+  /* The editor keeps at least 16rem, whatever width was stored. */
+  max-width: calc(100% - 16rem);
 
-  @media (max-width: $mantine-breakpoint-sm) {
+  @mixin smaller-than $mantine-breakpoint-sm {
     display: none;
   }
 }
 
 .treeSplitter {
-  @media (max-width: $mantine-breakpoint-sm) {
+  @mixin smaller-than $mantine-breakpoint-sm {
     display: none;
   }
 }
@@ -136,7 +138,7 @@
     color: var(--mantine-color-navy-0);
   }
 
-  @media (max-width: $mantine-breakpoint-sm) {
+  @mixin smaller-than $mantine-breakpoint-sm {
     display: none;
   }
 

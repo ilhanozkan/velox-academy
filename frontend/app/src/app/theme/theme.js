@@ -71,8 +71,10 @@ const accessibleColorVariables = Object.fromEntries(
 export const cssVariablesResolver = () => ({
   variables: {},
   light: {
-    // `dimmed` text (gray.6) is also below 4.5:1 on white.
+    // `dimmed` text (gray.6) and form errors (red.6) are also below 4.5:1 on
+    // white.
     "--mantine-color-dimmed": "#5c636e",
+    "--mantine-color-error": "#c92a2a",
     ...accessibleColorVariables,
   },
   dark: {},

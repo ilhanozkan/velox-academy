@@ -80,6 +80,8 @@
 
 .sidePane {
   flex: 0 0 var(--side-size, 45%);
+  /* Leave room for the file list and the editor on small screens. */
+  max-width: calc(100% - 20rem);
   min-width: 0;
   min-height: 0;
   display: flex;
@@ -135,7 +137,7 @@
   display: none;
 }
 
-@media (max-width: $mantine-breakpoint-sm) {
+@mixin smaller-than $mantine-breakpoint-sm {
   .sideSplitter,
   .tabsList {
     display: none;

@@ -13,7 +13,7 @@
 .category {
   flex: 0 1 13rem;
 
-  @media (max-width: $mantine-breakpoint-sm) {
+  @mixin smaller-than $mantine-breakpoint-sm {
     flex: 1 1 10rem;
   }
 }

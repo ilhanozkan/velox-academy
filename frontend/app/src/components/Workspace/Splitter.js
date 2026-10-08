@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 
 import classes from "./Splitter.module.css";
 
@@ -12,6 +12,15 @@ import classes from "./Splitter.module.css";
  */
 const Splitter = ({ label, value, min, max, onDrag, onStep, onReset, className }) => {
   const dragging = useRef(false);
+
+  // Unmounted mid-drag (e.g. the workspace switched to a loading screen):
+  // do not leave the whole page in "resizing" mode.
+  useEffect(
+    () => () => {
+      if (dragging.current) delete document.body.dataset.resizing;
+    },
+    []
+  );
 
   const onPointerDown = (event) => {
     if (event.button !== 0) return;
@@ -54,6 +63,7 @@ const Splitter = ({ label, value, min, max, onDrag, onStep, onReset, className }
       onPointerMove={onPointerMove}
       onPointerUp={stop}
       onPointerCancel={stop}
+      onLostPointerCapture={stop}
       onDoubleClick={onReset}
       onKeyDown={onKeyDown}
     />

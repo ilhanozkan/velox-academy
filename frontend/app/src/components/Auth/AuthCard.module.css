@@ -4,7 +4,7 @@
   grid-template-columns: minmax(22rem, 5fr) 7fr;
   background-color: var(--mantine-color-white);
 
-  @media (max-width: $mantine-breakpoint-md) {
+  @mixin smaller-than $mantine-breakpoint-md {
     grid-template-columns: 1fr;
   }
 }
@@ -23,7 +23,7 @@
     radial-gradient(circle at 10% 90%, rgba(75, 92, 192, 0.3), transparent 50%),
     linear-gradient(160deg, var(--mantine-color-primary-9) 0%, var(--mantine-color-primary-6) 100%);
 
-  @media (max-width: $mantine-breakpoint-md) {
+  @mixin smaller-than $mantine-breakpoint-md {
     display: none;
   }
 }
@@ -85,7 +85,7 @@
   justify-content: center;
   padding: 3rem 1.5rem;
 
-  @media (max-width: $mantine-breakpoint-md) {
+  @mixin smaller-than $mantine-breakpoint-md {
     align-items: flex-start;
     padding: 2rem 1rem;
     background-color: var(--mantine-color-gray-0);
@@ -103,7 +103,7 @@
   height: auto;
   margin: 0 auto 2rem;
 
-  @media (max-width: $mantine-breakpoint-md) {
+  @mixin smaller-than $mantine-breakpoint-md {
     display: block;
   }
 }
@@ -112,13 +112,13 @@
   font-size: 1.75rem;
   color: var(--mantine-color-primary-9);
 
-  @media (max-width: $mantine-breakpoint-md) {
+  @mixin smaller-than $mantine-breakpoint-md {
     text-align: center;
   }
 }
 
 .subtitle {
-  @media (max-width: $mantine-breakpoint-md) {
+  @mixin smaller-than $mantine-breakpoint-md {
     text-align: center;
   }
 }
@@ -126,7 +126,7 @@
 .form {
   margin-top: 2rem;
 
-  @media (max-width: $mantine-breakpoint-md) {
+  @mixin smaller-than $mantine-breakpoint-md {
     padding: 1.25rem;
     border: 1px solid var(--mantine-color-gray-3);
     border-radius: var(--mantine-radius-md);

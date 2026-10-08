@@ -133,6 +133,7 @@ const notifyCompletion = (completion) => {
 
 const SIDE_RATIO = { default: 0.45, min: 0.25, max: 0.7, step: 0.02 };
 const clampRatio = (ratio) => Math.min(SIDE_RATIO.max, Math.max(SIDE_RATIO.min, ratio));
+const sanitizeRatio = (value) => (Number.isFinite(value) ? clampRatio(value) : null);
 
 const MOBILE_VIEWS = [
   { value: "instructions", label: "Yönergeler", icon: IconBook2 },
@@ -167,7 +168,11 @@ const WorkspaceContent = ({ training, setTraining, sandboxAvailable, sandboxNoti
   const [tab, setTab] = useState("instructions");
   // Small screens show one pane at a time; this selects the editor.
   const [showCode, setShowCode] = useState(false);
-  const [sideRatio, setSideRatio] = useStoredState("velox.workspace.sideRatio", SIDE_RATIO.default);
+  const [sideRatio, setSideRatio] = useStoredState(
+    "velox.workspace.sideRatio",
+    SIDE_RATIO.default,
+    sanitizeRatio
+  );
   const bodyRef = useRef(null);
   const [completing, setCompleting] = useState(false);
   const [currentId, setCurrentId] = useState(() =>
@@ -240,7 +245,10 @@ const WorkspaceContent = ({ training, setTraining, sandboxAvailable, sandboxNoti
 
   const resizeSide = (clientX) => {
     const rect = bodyRef.current?.getBoundingClientRect();
-    if (rect?.width) setSideRatio(clampRatio((rect.right - clientX) / rect.width));
+    if (!rect?.width) return;
+    // Same limit as the CSS max-width: 20rem (320 px) for the editor side.
+    const max = Math.max(SIDE_RATIO.min, 1 - 320 / rect.width);
+    setSideRatio(Math.min(max, clampRatio((rect.right - clientX) / rect.width)));
   };
 
   if (sandboxAvailable && connectError)
@@ -278,7 +286,7 @@ const WorkspaceContent = ({ training, setTraining, sandboxAvailable, sandboxNoti
               component={Link}
               href="/egitimler"
               variant="subtle"
-              color="gray"
+              color="navy.1"
               className={classes.headerIcon}
               aria-label="Eğitimlere dön"
             >
@@ -317,7 +325,7 @@ const WorkspaceContent = ({ training, setTraining, sandboxAvailable, sandboxNoti
           {sandboxAvailable ? (
             <Menu position="bottom-end" withinPortal>
               <Menu.Target>
-                <ActionIcon variant="subtle" color="gray" className={classes.headerIcon} aria-label="Çalışma alanı menüsü">
+                <ActionIcon variant="subtle" color="navy.1" className={classes.headerIcon} aria-label="Çalışma alanı menüsü">
                   <IconDotsVertical size={18} />
                 </ActionIcon>
               </Menu.Target>
