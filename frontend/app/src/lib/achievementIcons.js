@@ -25,3 +25,6 @@ const ICONS = {
 };
 
 export const achievementIcon = (name) => ICONS[name] || IconTrophy;
+
+/** Icon names offered in the admin editor. */
+export const ACHIEVEMENT_ICON_NAMES = ["trophy", ...Object.keys(ICONS)];

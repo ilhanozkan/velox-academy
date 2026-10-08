@@ -6,12 +6,22 @@ import { useParams } from "next/navigation";
 import { Accordion, ActionIcon, Anchor, Badge, Button, Card, Center, Group, Loader, Stack, Text, Tooltip } from "@mantine/core";
 import { modals } from "@mantine/modals";
 import { notifications } from "@mantine/notifications";
-import { IconArrowDown, IconArrowLeft, IconArrowUp, IconPencil, IconPlus, IconTrash, IconTrophy } from "@tabler/icons-react";
+import {
+  IconArrowDown,
+  IconArrowLeft,
+  IconArrowUp,
+  IconPencil,
+  IconPlus,
+  IconTrash,
+  IconTrophy,
+  IconTrophyFilled,
+} from "@tabler/icons-react";
 
 import api, { errorMessage } from "@/lib/api";
 import PageHeader from "@/components/PageHeader/PageHeader";
 import ErrorState from "@/components/ErrorState/ErrorState";
 import ContentFormModal from "./ContentFormModal";
+import AchievementFormModal from "./AchievementFormModal";
 
 const MoveButtons = ({ index, count, onMove, label }) => (
   <>
@@ -40,6 +50,8 @@ const AdminTrainingEditor = () => {
   const [error, setError] = useState(null);
   // { kind, item, parentId } of the open form, or null
   const [form, setForm] = useState(null);
+  // { achievement, instruction } of the open achievement form, or null
+  const [achievementForm, setAchievementForm] = useState(null);
 
   const load = useCallback(async () => {
     setError(null);
@@ -191,13 +203,32 @@ const AdminTrainingEditor = () => {
                               </Text>
                             ) : null}
                           </div>
-                          {instruction.achievements?.length ? (
-                            <Tooltip label={`Başarı: ${instruction.achievements.map((a) => a.name).join(", ")}`}>
-                              <IconTrophy size={16} color="var(--mantine-color-yellow-6)" aria-label="Başarı veriyor" />
-                            </Tooltip>
-                          ) : null}
                         </Group>
                         <Group gap={2} wrap="nowrap">
+                          {(instruction.achievements || []).map((achievement) => (
+                            <Tooltip key={achievement.id} label={`Başarı: ${achievement.name} (düzenle)`}>
+                              <ActionIcon
+                                variant="subtle"
+                                color="yellow"
+                                onClick={() => setAchievementForm({ achievement, instruction })}
+                                aria-label={`${achievement.name} başarısını düzenle`}
+                              >
+                                <IconTrophyFilled size={16} />
+                              </ActionIcon>
+                            </Tooltip>
+                          ))}
+                          {!instruction.achievements?.length ? (
+                            <Tooltip label="Başarı ekle">
+                              <ActionIcon
+                                variant="subtle"
+                                color="gray"
+                                onClick={() => setAchievementForm({ achievement: null, instruction })}
+                                aria-label={`${instruction.name} için başarı ekle`}
+                              >
+                                <IconTrophy size={16} />
+                              </ActionIcon>
+                            </Tooltip>
+                          ) : null}
                           <MoveButtons
                             index={index}
                             count={chapter.instructions.length}
@@ -247,6 +278,15 @@ const AdminTrainingEditor = () => {
       ) : (
         <Text c="dimmed">Bu eğitimde henüz bölüm yok. İlk bölümü ekleyerek başlayın.</Text>
       )}
+
+      <AchievementFormModal
+        opened={Boolean(achievementForm)}
+        achievement={achievementForm?.achievement}
+        instruction={achievementForm?.instruction}
+        trainingId={training.id}
+        onClose={() => setAchievementForm(null)}
+        onSaved={load}
+      />
 
       <ContentFormModal
         opened={Boolean(form)}
