@@ -1,8 +1,20 @@
-const { Model } = require("objection");
+const BaseModel = require("./BaseModel");
 
-class Category extends Model {
+class Category extends BaseModel {
   static get tableName() {
     return "categories";
+  }
+
+  static get jsonSchema() {
+    return {
+      type: "object",
+      required: ["name"],
+      properties: {
+        id: { type: "integer" },
+        name: { type: "string", minLength: 1, maxLength: 255 },
+        description: { type: ["string", "null"] },
+      },
+    };
   }
 
   static get relationMappings() {
@@ -10,7 +22,7 @@ class Category extends Model {
 
     return {
       trainings: {
-        relation: Model.HasManyRelation,
+        relation: BaseModel.HasManyRelation,
         modelClass: Training,
         join: {
           from: "categories.id",

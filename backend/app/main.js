@@ -82,8 +82,15 @@ router.post("/api/machines", async (req, res) => {
 // //   authenticateGCloud();
 // // });
 
-createTables().then(() => {
-  app.listen(port, () => {
-    console.log(`Server is running on port ${port}`);
+createTables()
+  .then(() => {
+    app.listen(port, () => {
+      console.log(`Server is running on port ${port}`);
+    });
+  })
+  .catch((error) => {
+    // Without a migrated database every endpoint would fail; exit so the
+    // container restarts instead of serving errors.
+    console.error("Veritabanı hazırlanamadı, sunucu başlatılmıyor:", error);
+    process.exit(1);
   });
-});
