@@ -46,3 +46,18 @@ yarn build    # production build, also run in CI
 The session is an `httpOnly` cookie set by the API; the app never reads the
 token. `RequireAuth` / `GuestOnly` (`src/components/Auth/AuthGuard.js`)
 redirect based on the profile request made when the app loads.
+
+## UI conventions
+
+- Colors come from `src/app/theme/theme.js`: `primary` (brand indigo, shade 6
+  for buttons and links) and `navy` (the workspace's dark surfaces). Its CSS
+  variables resolver darkens Mantine's teal, green, red, gray, … where the
+  defaults fail WCAG AA contrast, so plain color names (`color="teal"`) are
+  safe to use.
+- Shared building blocks: `PageHeader`, `EmptyState`, `ErrorState`,
+  `FullPageLoader`.
+- Workspace shortcuts: `Ctrl/⌘ + Enter` saves and runs, `Ctrl/⌘ + S` saves.
+  Pane sizes are kept in `localStorage` (`velox.workspace.*`) through
+  `src/hooks/useStoredState.js`.
+- Below the `sm` breakpoint the workspace shows one pane at a time with a
+  bottom navigation, and the file list opens in a drawer.
