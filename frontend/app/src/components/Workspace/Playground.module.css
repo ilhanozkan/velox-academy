@@ -2,12 +2,22 @@
   display: flex;
   height: 100%;
   min-height: 0;
-  background-color: #1e1e1e;
+  background-color: var(--mantine-color-navy-8);
 }
 
 .sidebar {
-  width: 12rem;
   flex-shrink: 0;
+  min-width: 0;
+
+  @media (max-width: $mantine-breakpoint-sm) {
+    display: none;
+  }
+}
+
+.treeSplitter {
+  @media (max-width: $mantine-breakpoint-sm) {
+    display: none;
+  }
 }
 
 .editorArea {
@@ -15,13 +25,30 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
+  container-type: inline-size;
+}
+
+/* Open files and the run button */
+.toolbar {
+  display: flex;
+  align-items: stretch;
+  min-height: 2.5rem;
+  background-color: var(--mantine-color-navy-7);
+  border-bottom: 1px solid var(--mantine-color-navy-6);
+}
+
+.filesButton {
+  height: auto;
+  color: var(--mantine-color-navy-1);
+  border-right: 1px solid var(--mantine-color-navy-6);
 }
 
 .tabs {
+  flex: 1;
+  min-width: 0;
   display: flex;
   overflow-x: auto;
-  background-color: var(--mantine-color-secondary-9);
-  min-height: 2.25rem;
+  scrollbar-width: thin;
 }
 
 .tab {
@@ -29,12 +56,18 @@
   align-items: center;
   gap: 0.15rem;
   padding-right: 0.4rem;
-  color: #c3c9e6;
-  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  color: var(--mantine-color-navy-2);
+  border-right: 1px solid var(--mantine-color-navy-6);
+  box-shadow: inset 0 2px 0 transparent;
+
+  &:hover {
+    color: var(--mantine-color-navy-0);
+  }
 
   &[data-active] {
-    background-color: #1e1e1e;
-    color: #fff;
+    background-color: var(--mantine-color-navy-8);
+    color: var(--mantine-color-white);
+    box-shadow: inset 0 2px 0 var(--mantine-color-primary-4);
   }
 }
 
@@ -49,8 +82,15 @@
   white-space: nowrap;
 
   &:focus-visible {
-    outline: 2px solid var(--mantine-color-blue-4);
+    outline: 2px solid var(--mantine-color-primary-4);
+    outline-offset: -2px;
   }
+}
+
+.runButton {
+  align-self: center;
+  flex-shrink: 0;
+  margin: 0 0.5rem;
 }
 
 .editor {
@@ -59,9 +99,67 @@
   min-height: 0;
 }
 
-.runButton {
-  position: absolute;
-  right: 1rem;
-  bottom: 1.25rem;
-  z-index: 5;
+/* Language, save state and shortcut hints */
+.statusBar {
+  display: flex;
+  align-items: center;
+  gap: var(--mantine-spacing-md);
+  min-height: 1.6rem;
+  padding: 0 0.75rem;
+  font-size: var(--mantine-font-size-xs);
+  color: var(--mantine-color-navy-2);
+  background-color: var(--mantine-color-navy-7);
+  border-top: 1px solid var(--mantine-color-navy-6);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.statusItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+
+  &[data-tone="error"] {
+    color: var(--mantine-color-red-4);
+  }
+}
+
+.shortcuts {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+
+  kbd {
+    background-color: var(--mantine-color-navy-6);
+    border-color: var(--mantine-color-navy-5);
+    color: var(--mantine-color-navy-0);
+  }
+
+  @media (max-width: $mantine-breakpoint-sm) {
+    display: none;
+  }
+
+  /* Narrow editor (wide side panel): keep the language and save state. */
+  @container (max-width: 34rem) {
+    display: none;
+  }
+}
+
+/* Mobile file drawer */
+.drawerContent {
+  background-color: var(--mantine-color-navy-7);
+}
+
+.drawerHeader {
+  background-color: var(--mantine-color-navy-7);
+  color: var(--mantine-color-white);
+
+  button {
+    color: var(--mantine-color-navy-1);
+  }
+}
+
+.drawerBody {
+  padding: 0;
 }

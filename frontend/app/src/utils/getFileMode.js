@@ -30,3 +30,22 @@ export const getFileMode = ({ selectedFile }) => {
   const extension = String(selectedFile || "").split(".").pop().toLowerCase();
   return LANGUAGES[extension] || "plaintext";
 };
+
+const LANGUAGE_LABELS = {
+  javascript: "JavaScript",
+  typescript: "TypeScript",
+  python: "Python",
+  mysql: "SQL",
+  markdown: "Markdown",
+  json: "JSON",
+  html: "HTML",
+  css: "CSS",
+  scss: "SCSS",
+  shell: "Shell",
+  yaml: "YAML",
+  plaintext: "Düz metin",
+};
+
+/** Display name of a Monaco language id ("mysql" → "SQL"). */
+export const languageLabel = (language) =>
+  LANGUAGE_LABELS[language] || language.charAt(0).toUpperCase() + language.slice(1);

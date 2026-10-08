@@ -17,6 +17,9 @@ import Markdown from "@/components/Markdown/Markdown";
 import { flattenInstructions } from "./curriculum";
 import classes from "./InstructionsPanel.module.css";
 
+// In a narrow panel the previous/next buttons show only their arrows.
+const navButtonClassNames = { label: classes.navLabel, section: classes.navSection };
+
 const InstructionsPanel = ({ training, currentId, onSelect, onToggleComplete, completing }) => {
   const [tocOpened, toc] = useDisclosure(false);
   const steps = useMemo(() => flattenInstructions(training), [training]);
@@ -54,7 +57,13 @@ const InstructionsPanel = ({ training, currentId, onSelect, onToggleComplete, co
       </div>
 
       {/* key: start each step at the top instead of the previous scroll position. */}
-      <ScrollArea key={step.id} className={classes.content} type="auto">
+      <ScrollArea
+        key={step.id}
+        className={classes.content}
+        type="auto"
+        // Focusable so the lesson can be scrolled with the keyboard.
+        viewportProps={{ tabIndex: 0, role: "region", "aria-label": "Yönerge içeriği" }}
+      >
         <div className={classes.inner}>
           <Group gap="xs" mb="sm">
             <Badge variant="light">
@@ -80,6 +89,8 @@ const InstructionsPanel = ({ training, currentId, onSelect, onToggleComplete, co
           leftSection={<IconArrowLeft size={16} />}
           disabled={!prev}
           onClick={() => prev && onSelect(prev.id)}
+          aria-label="Önceki adım"
+          classNames={navButtonClassNames}
         >
           Önceki
         </Button>
@@ -110,6 +121,8 @@ const InstructionsPanel = ({ training, currentId, onSelect, onToggleComplete, co
           rightSection={<IconArrowRight size={16} />}
           disabled={!next}
           onClick={() => next && onSelect(next.id)}
+          aria-label="Sonraki adım"
+          classNames={navButtonClassNames}
         >
           Sonraki
         </Button>
