@@ -53,7 +53,8 @@ const InstructionsPanel = ({ training, currentId, onSelect, onToggleComplete, co
         <Progress value={training.progress.percent} size="sm" mt={6} aria-label="Eğitim ilerlemesi" />
       </div>
 
-      <ScrollArea className={classes.content} type="auto">
+      {/* key: start each step at the top instead of the previous scroll position. */}
+      <ScrollArea key={step.id} className={classes.content} type="auto">
         <div className={classes.inner}>
           <Group gap="xs" mb="sm">
             <Badge variant="light">

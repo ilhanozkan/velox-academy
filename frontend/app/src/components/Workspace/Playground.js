@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ActionIcon, Button, Center, Text, Tooltip } from "@mantine/core";
+import { notifications } from "@mantine/notifications";
 import { IconPlayerPlay, IconPoint, IconX } from "@tabler/icons-react";
 
 import { useSocket } from "@/contexts/SocketContext";
@@ -42,9 +43,17 @@ const Playground = ({ onRun, running }) => {
   const [tree, setTree] = useState({});
   const [openFiles, setOpenFiles] = useState([]);
   const [activeFile, setActiveFile] = useState(null);
-  // path -> { saved, current, loading }
+  // path -> { saved, current, loading, error }
   const [files, setFiles] = useState({});
   const saveTimers = useRef({});
+  // path -> content waiting for its autosave
+  const pendingSaves = useRef({});
+
+  // Monaco keeps its models (one per path) for the whole page session. Prefix
+  // them per workspace so another training, user or recreated sandbox never
+  // gets the text of a file with the same name; they are disposed on unmount.
+  const [modelScope] = useState(() => `ws-${Math.random().toString(36).slice(2, 10)}`);
+  const monacoRef = useRef(null);
 
   const loadTree = useCallback(async () => {
     try {
@@ -62,7 +71,8 @@ const Playground = ({ onRun, running }) => {
       setActiveFile(path);
       setOpenFiles((current) => (current.includes(path) ? current : [...current, path]));
 
-      if (files[path]) return;
+      // Reload files whose previous load failed.
+      if (files[path] && !files[path].error) return;
       setFiles((current) => ({ ...current, [path]: { saved: "", current: "", loading: true } }));
       try {
         const { content } = await sandboxFetch(`/files/content?path=${encodeURIComponent(path)}`);
@@ -91,20 +101,54 @@ const Playground = ({ onRun, running }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isConnected, loadTree]);
 
+  // An open file changed on the sandbox (terminal, another tab): show the new
+  // content unless it has unsaved edits, which win at the next save. A
+  // deleted file shows an error instead of being recreated by autosave.
+  const reloadFile = useCallback(
+    async (path) => {
+      let content = null;
+      let error = null;
+      try {
+        ({ content } = await sandboxFetch(`/files/content?path=${encodeURIComponent(path)}`));
+      } catch (err) {
+        error = err.message;
+      }
+      setFiles((current) => {
+        const file = current[path];
+        if (!file || file.loading || file.current !== file.saved) return current;
+        if (error) return { ...current, [path]: { ...file, error } };
+        if (content === file.saved && !file.error) return current;
+        return { ...current, [path]: { saved: content, current: content, loading: false } };
+      });
+    },
+    [sandboxFetch]
+  );
+
+  const openPaths = useRef(openFiles);
+  useEffect(() => {
+    openPaths.current = openFiles;
+  }, [openFiles]);
+
   // Files created or deleted from the terminal show up in the explorer.
   useEffect(() => {
     if (!socket) return;
     let timer;
-    const onRefresh = () => {
+    const changed = new Set();
+    const onRefresh = (path) => {
+      if (typeof path === "string") changed.add(path);
       clearTimeout(timer);
-      timer = setTimeout(loadTree, 300);
+      timer = setTimeout(() => {
+        loadTree();
+        for (const changedPath of changed) if (openPaths.current.includes(changedPath)) reloadFile(changedPath);
+        changed.clear();
+      }, 300);
     };
     socket.on("file:refresh", onRefresh);
     return () => {
       clearTimeout(timer);
       socket.off("file:refresh", onRefresh);
     };
-  }, [socket, loadTree]);
+  }, [socket, loadTree, reloadFile]);
 
   const save = useCallback(
     (path, content) =>
@@ -129,17 +173,74 @@ const Playground = ({ onRun, running }) => {
     setFiles((current) => ({ ...current, [path]: { ...current[path], current: content } }));
 
     clearTimeout(saveTimers.current[path]);
-    saveTimers.current[path] = setTimeout(() => save(path, content), SAVE_DELAY_MS);
+    pendingSaves.current[path] = content;
+    saveTimers.current[path] = setTimeout(() => {
+      delete pendingSaves.current[path];
+      save(path, content);
+    }, SAVE_DELAY_MS);
   };
 
+  // Leaving the workspace within the autosave delay used to drop the last
+  // edits. Layout effect cleanups run before the socket provider disconnects.
+  const socketRef = useRef(socket);
+  useEffect(() => {
+    socketRef.current = socket;
+  }, [socket]);
+  useLayoutEffect(
+    () => () => {
+      for (const [path, content] of Object.entries(pendingSaves.current)) {
+        clearTimeout(saveTimers.current[path]);
+        socketRef.current?.emit("file:change", { path, content });
+      }
+      pendingSaves.current = {};
+    },
+    []
+  );
+
+  // Warn before closing the tab while edits are not saved yet.
+  const hasUnsaved = Object.values(files).some((file) => !file.loading && file.current !== file.saved);
+  useEffect(() => {
+    if (!hasUnsaved) return;
+    const onBeforeUnload = (event) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [hasUnsaved]);
+
+  // Drop this workspace's Monaco models when it closes.
+  useEffect(
+    () => () => {
+      monacoRef.current?.editor
+        .getModels()
+        .filter((model) => model.uri.path.startsWith(`/${modelScope}/`) && !model.isAttachedToEditor())
+        .forEach((model) => model.dispose());
+    },
+    [modelScope]
+  );
+
+  const handleEditorMount = useCallback((editor, monaco) => {
+    monacoRef.current = monaco;
+  }, []);
+
   // Save first, then run; the old button could run the previous version of a
-  // file edited less than a second ago.
+  // file edited less than a second ago. If the save fails, running would show
+  // the output of the old version, so stop.
   const run = useCallback(async () => {
     if (!activeFile || !socket) return;
     const file = files[activeFile];
 
     clearTimeout(saveTimers.current[activeFile]);
-    if (file && file.current !== file.saved) await save(activeFile, file.current);
+    delete pendingSaves.current[activeFile];
+    if (file && file.current !== file.saved && !(await save(activeFile, file.current))) {
+      notifications.show({
+        color: "red",
+        title: "Dosya kaydedilemedi",
+        message: "Değişiklikleriniz sanal makineye kaydedilemediği için dosya çalıştırılmadı. Bağlantıyı kontrol edip tekrar deneyin.",
+      });
+      return;
+    }
     onRun(activeFile);
   }, [activeFile, files, onRun, save, socket]);
 
@@ -199,10 +300,11 @@ const Playground = ({ onRun, running }) => {
               </Center>
             ) : (
               <CodeEditor
-                path={activeFile}
+                path={`/${modelScope}${activeFile}`}
                 language={getFileMode({ selectedFile: activeFile })}
                 value={active.current}
                 onChange={handleChange}
+                onMount={handleEditorMount}
               />
             )
           ) : (

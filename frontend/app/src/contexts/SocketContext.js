@@ -30,7 +30,9 @@ export const SocketProvider = ({ children, url, token }) => {
     if (!url) return;
 
     setConnectError(null);
-    const newSocket = io(url, { auth: { token }, reconnectionAttempts: 5 });
+    // socket.io keeps retrying (with backoff) after a drop: a limit used to
+    // leave the workspace "reconnecting" forever after a long sleep.
+    const newSocket = io(url, { auth: { token } });
     setSocket(newSocket);
 
     const timeout = setTimeout(() => {

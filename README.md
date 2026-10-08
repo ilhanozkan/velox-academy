@@ -20,7 +20,7 @@ The project consists of three main components:
 - **Sandbox Environments**: Real-time virtual machines powered by Google Cloud Platform
 - **Course Management**: Organized categories, trainings, chapters, and achievements
 - **User Management**: Authentication, progress tracking, and user sandboxes
-- **Admin Dashboard**: Platform statistics, user management (roles, blocking) and a curriculum editor with markdown preview
+- **Admin Dashboard**: Platform statistics, user management (roles, blocking) and a curriculum editor with markdown preview and achievements
 - **Real-time Terminal**: In-browser terminal access to virtual environments
 
 ## 📁 Project Structure
@@ -230,6 +230,11 @@ Each VM receives a random access token through the `velox-sandbox-token`
 instance metadata key, and the sandbox service refuses connections without it.
 Rebuild the image from the current `vm-image/` code to enable this check (and
 do not set `ALLOW_NO_TOKEN` on VMs).
+
+The browser connects to each VM directly at `http://<external-ip>:9000`. If the
+frontend is served over HTTPS, browsers block these plain-HTTP connections
+(mixed content): put the sandboxes behind a TLS-terminating proxy or load
+balancer and return its `https://` address as the sandbox URL.
 
 ## 📊 Database Schema
 

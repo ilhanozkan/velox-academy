@@ -17,8 +17,10 @@ export const RequireAuth = ({ children, admin = false }) => {
   const isAdmin = useSelector(selectIsAdmin);
 
   useEffect(() => {
+    // Keep the query (e.g. ?adim= in the workspace) so the user comes back
+    // to the same place after logging in.
     if (status === "unauthenticated")
-      router.replace(`/giris-yap?next=${encodeURIComponent(pathname)}`);
+      router.replace(`/giris-yap?next=${encodeURIComponent(pathname + window.location.search)}`);
     else if (status === "authenticated" && admin && !isAdmin) router.replace("/egitimler");
   }, [status, admin, isAdmin, pathname, router]);
 
@@ -26,8 +28,21 @@ export const RequireAuth = ({ children, admin = false }) => {
   return children;
 };
 
-// Only accept local paths as redirect targets after login.
-const safeNext = (next) => (next && next.startsWith("/") && !next.startsWith("//") ? next : "/egitimler");
+/**
+ * Only accept paths on this site as redirect targets after login. A prefix
+ * check is not enough: browsers read "/\evil.com" or "/\t/evil.com" as
+ * another host, so resolve the value and compare origins.
+ */
+const safeNext = (next) => {
+  if (!next || !next.startsWith("/")) return "/egitimler";
+  try {
+    const url = new URL(next, window.location.origin);
+    if (url.origin !== window.location.origin) return "/egitimler";
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return "/egitimler";
+  }
+};
 
 /** Login/register pages: logged-in users are sent on to the app. */
 export const GuestOnly = ({ children }) => {

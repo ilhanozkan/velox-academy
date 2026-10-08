@@ -6,7 +6,7 @@ import { useForm } from "@mantine/form";
 import { notifications } from "@mantine/notifications";
 
 import api, { errorMessage, fieldErrors } from "@/lib/api";
-import { slugify } from "@/lib/slugify";
+import { contentId } from "@/lib/slugify";
 import Markdown from "@/components/Markdown/Markdown";
 
 /**
@@ -48,9 +48,7 @@ const ContentFormModal = ({ opened, onClose, kind, item, parentId, onSaved }) =>
       if (editing) {
         await api.put(`/admin/${resource}/${item.id}`, payload);
       } else {
-        // Ids must be unique; a short random suffix avoids clashes between
-        // items with the same name.
-        const id = `${parentId}-${slugify(values.name).slice(0, 40)}-${Math.random().toString(36).slice(2, 6)}`;
+        const id = contentId(parentId, values.name, isInstruction ? "adim" : "bolum");
         await api.post(`/admin/${resource}`, {
           ...payload,
           id,

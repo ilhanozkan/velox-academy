@@ -23,32 +23,60 @@ import classes from "./Workspace.module.css";
 // xterm needs the browser.
 const Terminal = dynamic(() => import("./Terminal"), { ssr: false });
 
+// The sandbox stops programs after 15 s; give up waiting a little later.
+const RUN_RESULT_TIMEOUT_MS = 30000;
+
 /** Runs files on the sandbox and keeps the last result. */
 const useRunner = () => {
   const { socket } = useSocket();
   const [result, setResult] = useState(null);
   const [running, setRunning] = useState(false);
   const pending = useRef(null);
+  const timer = useRef(null);
 
+  const finish = useCallback((data) => {
+    clearTimeout(timer.current);
+    const { file, startedAt } = pending.current || {};
+    pending.current = null;
+    setResult({ data, file, durationMs: startedAt ? Date.now() - startedAt : undefined });
+    setRunning(false);
+  }, []);
+
+  // A result lost with the connection used to leave the run button spinning
+  // (and disabled) until the page was reloaded.
   useEffect(() => {
     if (!socket) return;
     const onResult = (data) => {
-      const { file, startedAt } = pending.current || {};
-      setResult({ data, file, durationMs: startedAt ? Date.now() - startedAt : undefined });
-      setRunning(false);
+      if (pending.current) finish(data);
+    };
+    const onDisconnect = () => {
+      if (pending.current)
+        finish({ error: true, message: "Bağlantı koptuğu için sonuç alınamadı. Bağlantı gelince tekrar çalıştırın." });
     };
     socket.on("result", onResult);
-    return () => socket.off("result", onResult);
-  }, [socket]);
+    socket.on("disconnect", onDisconnect);
+    return () => {
+      socket.off("result", onResult);
+      socket.off("disconnect", onDisconnect);
+      clearTimeout(timer.current);
+      pending.current = null;
+      setRunning(false);
+    };
+  }, [socket, finish]);
 
   const run = useCallback(
     (path) => {
       if (!socket) return;
       pending.current = { file: path.replace(/^\//, ""), startedAt: Date.now() };
       setRunning(true);
+      clearTimeout(timer.current);
+      timer.current = setTimeout(
+        () => finish({ error: true, message: "Sanal makine zamanında yanıt vermedi. Tekrar deneyin." }),
+        RUN_RESULT_TIMEOUT_MS
+      );
       socket.emit("run:file", { path });
     },
-    [socket]
+    [socket, finish]
   );
 
   return { result, running, run };
@@ -78,7 +106,7 @@ const notifyCompletion = (completion) => {
     notifications.show({ color: "teal", title: "Bölüm tamamlandı", message: "Harika gidiyorsunuz!" });
 };
 
-const WorkspaceContent = ({ training, setTraining, sandboxAvailable, onRecreate }) => {
+const WorkspaceContent = ({ training, setTraining, sandboxAvailable, sandboxNotice, onRecreate }) => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { isConnected, connectError, reconnect } = useSocket();
@@ -197,9 +225,20 @@ const WorkspaceContent = ({ training, setTraining, sandboxAvailable, onRecreate 
         </div>
       ) : (
         <div className={classes.instructionsOnly}>
-          <Alert color="yellow" m="md" title="Sanal laboratuvar şu anda kullanılamıyor">
-            Yönergeleri okuyup ilerlemenizi kaydedebilirsiniz; kod çalıştırma özelliği daha sonra açılacak.
-          </Alert>
+          {sandboxNotice ? (
+            <Alert color="red" m="md" title="Sanal makine hazırlanamadı" role="alert">
+              <Text size="sm">
+                {sandboxNotice.message} Yönergeleri okumaya ve ilerlemenizi kaydetmeye devam edebilirsiniz.
+              </Text>
+              <Button size="xs" mt="sm" onClick={sandboxNotice.onRetry}>
+                Yeniden oluştur
+              </Button>
+            </Alert>
+          ) : (
+            <Alert color="yellow" m="md" title="Sanal laboratuvar şu anda kullanılamıyor">
+              Yönergeleri okuyup ilerlemenizi kaydedebilirsiniz; kod çalıştırma özelliği daha sonra açılacak.
+            </Alert>
+          )}
           {instructions}
         </div>
       )}
@@ -259,12 +298,6 @@ const Workspace = () => {
           description="İlk açılışta bu işlem bir dakika kadar sürebilir. Sayfadan ayrılabilirsiniz; hazırlık arka planda devam eder."
         />
       );
-    case "error":
-      return (
-        <WorkspaceError title="Sanal makine hazırlanamadı" message={sandbox.error}>
-          <Button onClick={sandbox.retry}>Yeniden oluştur</Button>
-        </WorkspaceError>
-      );
     default:
       break;
   }
@@ -277,6 +310,10 @@ const Workspace = () => {
         training={training}
         setTraining={setTraining}
         sandboxAvailable={running}
+        // The lesson stays readable when the VM could not be prepared.
+        sandboxNotice={
+          sandbox.state === "error" ? { message: sandbox.error || "Bilinmeyen hata.", onRetry: sandbox.retry } : null
+        }
         onRecreate={sandbox.recreate}
       />
     </SocketProvider>
