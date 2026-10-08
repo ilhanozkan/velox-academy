@@ -2,7 +2,7 @@
 
 import { forwardRef } from "react";
 import { useRouter } from "next/navigation";
-import { Avatar, Group, Menu, Text, UnstyledButton, rem } from "@mantine/core";
+import { Avatar, Menu, Text, UnstyledButton, rem } from "@mantine/core";
 import { IconChevronDown, IconLogout, IconSettings } from "@tabler/icons-react";
 import { useDispatch, useSelector } from "react-redux";
 
@@ -20,22 +20,20 @@ export const initials = (user) =>
 
 const UserButton = forwardRef(({ user, ...others }, ref) => (
   <UnstyledButton ref={ref} className={classes.button} {...others}>
-    <Group gap="xs" wrap="nowrap">
-      <Avatar src={imageUrl(user?.profile_image)} radius="xl" size="sm" color="primary">
-        {initials(user)}
-      </Avatar>
+    <Avatar src={imageUrl(user?.profile_image)} radius="xl" size="sm" color="primary">
+      {initials(user)}
+    </Avatar>
 
-      <div className={classes.text}>
-        <Text size="sm" fw={500} truncate>
-          {user?.full_name || user?.username}
-        </Text>
-        <Text c="dimmed" size="xs" truncate>
-          {user?.email}
-        </Text>
-      </div>
+    <div className={classes.text}>
+      <Text size="sm" fw={500} truncate>
+        {user?.full_name || user?.username}
+      </Text>
+      <Text c="dimmed" size="xs" truncate>
+        {user?.email}
+      </Text>
+    </div>
 
-      <IconChevronDown size="1rem" aria-hidden />
-    </Group>
+    <IconChevronDown size="1rem" aria-hidden className={classes.chevron} />
   </UnstyledButton>
 ));
 UserButton.displayName = "UserButton";

@@ -79,7 +79,7 @@ const Results = ({ result, running }) => {
   const { data, file, durationMs } = result;
   const meta = (
     <Group gap="xs" mb="xs">
-      <Badge variant="light" color="gray">
+      <Badge variant="light" color="gray" tt="none">
         {file}
       </Badge>
       {Array.isArray(data) ? <Badge variant="light">{data.length} satır</Badge> : null}

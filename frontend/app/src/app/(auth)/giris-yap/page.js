@@ -5,6 +5,7 @@ export const metadata = {
   description: "Velox Academy hesabınıza giriş yapın",
 };
 
-const LoginPage = () => <LoginForm />;
+// `next`: where to go after signing in (set by the auth guard).
+const LoginPage = ({ searchParams }) => <LoginForm next={searchParams?.next} />;
 
 export default LoginPage;

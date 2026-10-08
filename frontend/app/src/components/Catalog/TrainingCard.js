@@ -32,7 +32,7 @@ const TrainingCard = ({ training, onOpen, loading }) => {
       <Stack gap={6} mt="md" className={classes.body}>
         <Group gap={6}>
           {training.category ? (
-            <Badge variant="light" size="sm">
+            <Badge variant="light" size="sm" tt="none">
               {training.category.name}
             </Badge>
           ) : null}

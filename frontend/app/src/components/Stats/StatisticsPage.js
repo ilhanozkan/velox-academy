@@ -135,6 +135,7 @@ const StatisticsPage = () => {
               series={[{ name: "Adım", color: "blue.6" }]}
               tickLine="none"
               gridAxis="y"
+              yAxisProps={{ allowDecimals: false }}
               withTooltip
             />
           </Card>

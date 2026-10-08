@@ -1,14 +1,7 @@
 "use client";
 
-import { Suspense } from "react";
-
 import { GuestOnly } from "@/components/Auth/AuthGuard";
-import FullPageLoader from "@/components/FullPageLoader/FullPageLoader";
 
-const AuthLayout = ({ children }) => (
-  <Suspense fallback={<FullPageLoader />}>
-    <GuestOnly>{children}</GuestOnly>
-  </Suspense>
-);
+const AuthLayout = ({ children }) => <GuestOnly>{children}</GuestOnly>;
 
 export default AuthLayout;

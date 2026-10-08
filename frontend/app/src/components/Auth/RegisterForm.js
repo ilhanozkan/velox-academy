@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { useSearchParams } from "next/navigation";
 import { Alert, Anchor, Button, PasswordInput, TextInput } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { notifications } from "@mantine/notifications";
@@ -15,9 +14,8 @@ import AuthCard from "./AuthCard";
 // Mirrors the server-side rules in models/User.js.
 export const USERNAME_PATTERN = /^[A-Za-z0-9_.-]{3,30}$/;
 
-const RegisterForm = () => {
+const RegisterForm = ({ next }) => {
   const dispatch = useDispatch();
-  const searchParams = useSearchParams();
   const [error, setError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -55,9 +53,7 @@ const RegisterForm = () => {
     });
   };
 
-  const loginHref = searchParams.get("next")
-    ? `/giris-yap?next=${encodeURIComponent(searchParams.get("next"))}`
-    : "/giris-yap";
+  const loginHref = next ? `/giris-yap?next=${encodeURIComponent(next)}` : "/giris-yap";
 
   return (
     <AuthCard

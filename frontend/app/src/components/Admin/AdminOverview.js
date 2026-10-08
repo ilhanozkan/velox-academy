@@ -61,7 +61,7 @@ const AdminOverview = () => {
             <Stat label="Kullanıcı" value={stats.totalUsers} hint={`${stats.blockedUsers} engelli · ${stats.adminUsers} yönetici`} />
             <Stat label="Eğitim" value={stats.totalTrainings} hint={`${stats.totalChapters} bölüm · ${stats.totalInstructions} adım`} />
             <Stat label="Kayıt" value={stats.totalEnrollments} hint={`${stats.completedEnrollments} tamamlandı`} />
-            <Stat label="Çalışan sanal makine" value={stats.runningSandboxes} hint={`${stats.achievementsEarned} başarı kazanıldı`} />
+            <Stat label="Çalışan sanal makine" value={stats.runningSandboxes} hint="Şu anda açık öğrenci ortamları" />
           </SimpleGrid>
 
           <Grid gutter="lg">
@@ -74,7 +74,7 @@ const AdminOverview = () => {
                   <RingProgress
                     size={170}
                     thickness={16}
-                    roundCaps
+                    roundCaps={stats.enrollmentCompletionRate > 0}
                     sections={[{ value: stats.enrollmentCompletionRate, color: "teal" }]}
                     label={
                       <Text ta="center" fw={700} fz="xl">
@@ -84,7 +84,7 @@ const AdminOverview = () => {
                   />
                 </Center>
                 <Text size="sm" c="dimmed" ta="center">
-                  {stats.completedInstructions} adım tamamlandı
+                  {stats.completedInstructions} adım tamamlandı · {stats.achievementsEarned} başarı kazanıldı
                 </Text>
               </Card>
             </Grid.Col>

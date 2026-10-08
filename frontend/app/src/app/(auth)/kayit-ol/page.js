@@ -5,6 +5,7 @@ export const metadata = {
   description: "Velox Academy'de ücretsiz hesap oluşturun",
 };
 
-const RegisterPage = () => <RegisterForm />;
+// `next`: where to go after signing in (set by the auth guard).
+const RegisterPage = ({ searchParams }) => <RegisterForm next={searchParams?.next} />;
 
 export default RegisterPage;

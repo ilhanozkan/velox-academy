@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { useSearchParams } from "next/navigation";
 import { Alert, Anchor, Button, PasswordInput, TextInput } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { IconAlertCircle } from "@tabler/icons-react";
@@ -11,9 +10,8 @@ import { useDispatch } from "react-redux";
 import { login } from "@/lib/features/auth/authSlice";
 import AuthCard from "./AuthCard";
 
-const LoginForm = () => {
+const LoginForm = ({ next }) => {
   const dispatch = useDispatch();
-  const searchParams = useSearchParams();
   const [error, setError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -35,9 +33,7 @@ const LoginForm = () => {
     if (login.rejected.match(result)) setError(result.payload?.message);
   };
 
-  const registerHref = searchParams.get("next")
-    ? `/kayit-ol?next=${encodeURIComponent(searchParams.get("next"))}`
-    : "/kayit-ol";
+  const registerHref = next ? `/kayit-ol?next=${encodeURIComponent(next)}` : "/kayit-ol";
 
   return (
     <AuthCard
