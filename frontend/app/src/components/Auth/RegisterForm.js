@@ -109,7 +109,7 @@ const RegisterForm = ({ next }) => {
           {...form.getInputProps("confirmPassword")}
         />
 
-        <Button type="submit" fullWidth mt="xl" radius="md" loading={submitting}>
+        <Button type="submit" fullWidth mt="xl" size="md" loading={submitting}>
           Hesap Oluştur
         </Button>
       </form>
