@@ -8,13 +8,18 @@ const CONTENT_DIR = path.join(__dirname, "content");
 const readContent = (instructionId) =>
   fs.readFileSync(path.join(CONTENT_DIR, `${instructionId}.md`), "utf8");
 
-// The first paragraph line of an instruction becomes its short description.
-const summarize = (markdown) =>
-  markdown
-    .split("\n")
-    .find((line) => line.trim() && !line.startsWith("#"))
-    ?.trim()
-    .slice(0, 280) ?? null;
+// The first paragraph line of an instruction becomes its short description,
+// as plain text (lists and the admin editor show it without rendering).
+const summarize = (markdown) => {
+  const line = markdown.split("\n").find((l) => l.trim() && !l.startsWith("#"));
+  if (!line) return null;
+
+  return line
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1") // [text](url) -> text
+    .replace(/\*\*|__|`/g, "")
+    .trim()
+    .slice(0, 280);
+};
 
 // Seeds only insert rows that are missing (ON CONFLICT DO NOTHING), so they are
 // safe to run on every start and never overwrite edits made by an admin.

@@ -53,7 +53,13 @@ class UserService {
     if (data.username && (await User.query().where("username", data.username).first()))
       throw conflict("Bu kullanıcı adı alınmış", { username: "Bu kullanıcı adı alınmış" });
 
-    return await User.query().insert({ ...data, role: "user", status: "active" });
+    // Registration signs the user in, so it counts as their first login.
+    return await User.query().insert({
+      ...data,
+      role: "user",
+      status: "active",
+      last_login_at: new Date().toISOString(),
+    });
   }
 
   static async updateUser(id, userData) {
