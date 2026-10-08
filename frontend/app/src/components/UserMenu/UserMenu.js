@@ -18,22 +18,26 @@ export const initials = (user) =>
     .slice(0, 2)
     .toUpperCase();
 
-const UserButton = forwardRef(({ user, ...others }, ref) => (
-  <UnstyledButton ref={ref} className={classes.button} {...others}>
-    <Avatar src={imageUrl(user?.profile_image)} radius="xl" size="sm" color="primary">
-      {initials(user)}
-    </Avatar>
+// Only phrasing content (spans) inside the <button>.
+// Menu.Target passes its own className; merge it instead of overriding ours.
+const UserButton = forwardRef(({ user, className, ...others }, ref) => (
+  <UnstyledButton ref={ref} className={[classes.button, className].filter(Boolean).join(" ")} {...others}>
+    <span className={classes.inner}>
+      <Avatar src={imageUrl(user?.profile_image)} radius="xl" size="sm" color="primary">
+        {initials(user)}
+      </Avatar>
 
-    <div className={classes.text}>
-      <Text size="sm" fw={500} truncate>
-        {user?.full_name || user?.username}
-      </Text>
-      <Text c="dimmed" size="xs" truncate>
-        {user?.email}
-      </Text>
-    </div>
+      <span className={classes.text}>
+        <Text component="span" display="block" size="sm" fw={500} truncate>
+          {user?.full_name || user?.username}
+        </Text>
+        <Text component="span" display="block" c="dimmed" size="xs" truncate>
+          {user?.email}
+        </Text>
+      </span>
 
-    <IconChevronDown size="1rem" aria-hidden className={classes.chevron} />
+      <IconChevronDown size="1rem" aria-hidden className={classes.chevron} />
+    </span>
   </UnstyledButton>
 ));
 UserButton.displayName = "UserButton";
