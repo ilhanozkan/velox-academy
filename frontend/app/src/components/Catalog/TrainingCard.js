@@ -1,6 +1,6 @@
 "use client";
 
-import { Badge, Button, Card, Group, Image, Progress, Stack, Text } from "@mantine/core";
+import { Badge, Button, Card, Group, Image, Progress, Skeleton, Stack, Text } from "@mantine/core";
 import { IconBook2, IconClock } from "@tabler/icons-react";
 
 import { imageUrl } from "@/lib/api";
@@ -9,7 +9,7 @@ import classes from "./TrainingCard.module.css";
 
 const STATUS = {
   completed: { label: "Tamamlandı", color: "teal", action: "Tekrar gözden geçir" },
-  enrolled: { label: "Devam ediyor", color: "blue", action: "Devam et" },
+  enrolled: { label: "Devam ediyor", color: "primary.5", action: "Devam et" },
   new: { label: "Başlamadı", color: "gray", action: "Eğitime başla" },
 };
 
@@ -77,7 +77,7 @@ const TrainingCard = ({ training, onOpen, loading }) => {
             </Group>
             <Progress
               value={progress.percent}
-              color={training.isCompleted ? "teal" : "blue"}
+              color={training.isCompleted ? "teal" : "primary.5"}
               aria-label={`${training.name} ilerlemesi`}
             />
           </Stack>
@@ -90,5 +90,21 @@ const TrainingCard = ({ training, onOpen, loading }) => {
     </Card>
   );
 };
+
+export const TrainingCardSkeleton = () => (
+  <Card withBorder radius="md" p="md" className={classes.card} aria-hidden>
+    <Card.Section>
+      <Skeleton className={classes.cardImage} radius={0} />
+    </Card.Section>
+    <Group gap={6} mt="md">
+      <Skeleton height={18} width={110} radius="xl" />
+      <Skeleton height={18} width={80} radius="xl" />
+    </Group>
+    <Skeleton height={22} width="70%" mt="sm" />
+    <Skeleton height={12} mt="md" />
+    <Skeleton height={12} mt={8} width="85%" />
+    <Skeleton height={36} mt="xl" />
+  </Card>
+);
 
 export default TrainingCard;
