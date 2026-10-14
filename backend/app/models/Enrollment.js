@@ -1,8 +1,20 @@
-const { Model } = require("objection");
+const BaseModel = require("./BaseModel");
 
-class Enrollment extends Model {
+class Enrollment extends BaseModel {
   static get tableName() {
     return "enrollments";
+  }
+
+  static get jsonSchema() {
+    return {
+      type: "object",
+      properties: {
+        id: { type: "integer" },
+        user_id: { type: "integer" },
+        training_id: { type: "string" },
+        completed: { type: "boolean" },
+      },
+    };
   }
 
   static get relationMappings() {
@@ -11,7 +23,7 @@ class Enrollment extends Model {
 
     return {
       user: {
-        relation: Model.BelongsToOneRelation,
+        relation: BaseModel.BelongsToOneRelation,
         modelClass: User,
         join: {
           from: "enrollments.user_id",
@@ -19,7 +31,7 @@ class Enrollment extends Model {
         },
       },
       training: {
-        relation: Model.BelongsToOneRelation,
+        relation: BaseModel.BelongsToOneRelation,
         modelClass: Training,
         join: {
           from: "enrollments.training_id",

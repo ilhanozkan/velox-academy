@@ -1,1 +1,1 @@
-SELECT CustomerName, City FROM Customers;
+SELECT CustomerName, City FROM customers;

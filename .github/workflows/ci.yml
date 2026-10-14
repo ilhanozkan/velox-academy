@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  database:
+    name: Database migrations & seeds
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: velox
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DB_HOST: localhost
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      PGPASSWORD: postgres
+    defaults:
+      run:
+        working-directory: backend/app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: backend/app/package-lock.json
+
+      - run: npm ci
+
+      - name: Migrate a fresh database
+        run: npm run db:migrate
+
+      - name: Seed twice (seeds must be idempotent)
+        run: |
+          npm run db:seed
+          npm run db:seed
+          test "$(psql -h localhost -U postgres -d velox -tAc 'select count(*) from instructions')" -gt 0
+
+      - name: Roll back every migration and migrate again
+        run: |
+          npm run db:rollback:all
+          npm run db:migrate
+
+      - name: Upgrade a database created by the original schema
+        env:
+          DB_NAME: velox_legacy
+        run: |
+          psql -h localhost -U postgres -c "create database velox_legacy"
+          psql -h localhost -U postgres -d velox_legacy -v ON_ERROR_STOP=1 -q -f test/fixtures/legacy-v1.sql
+          npm run db:status
+          npm run db:migrate
+          npm run db:seed
+          npm run db:status

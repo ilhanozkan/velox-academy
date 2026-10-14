@@ -68,8 +68,39 @@ class Achievement << Entity >> {
   + id: String
   + name: String
   + description: String
+  + icon: String
+  + points: Integer
   + instruction_id: String
-  + user_id: String
+}
+
+class Enrollment << Entity >> {
+  + id: Integer
+  + user_id: Integer
+  + training_id: String
+  + completed: Boolean
+  + completed_at: Date
+}
+
+class UserSandbox << Entity >> {
+  + id: Integer
+  + user_id: Integer
+  + training_id: String
+  + provider: gcp | local
+  + vm_status: String
+  + vm_external_ip: String
+  + access_token: String
+}
+
+class InstructionCompletion << Entity >> {
+  + user_id: Integer
+  + instruction_id: String
+  + completed_at: Date
+}
+
+class ChapterCompletion << Entity >> {
+  + user_id: Integer
+  + chapter_id: String
+  + completed_at: Date
 }
 
 class Sandbox << Entity >> {
@@ -100,14 +131,14 @@ class File << Entity >> {
 }
 
 class User << Entity >> {
-  + id: String
-  + name: String
+  + id: Integer
+  + username: String
   + email: String
   + password: String
-  + status: String
-  + profileImage: String
-  + blocked: Boolean
-  + role: String
+  + full_name: String
+  + status: active | blocked
+  + profile_image: String
+  + role: user | admin
   + achievements : Achievement[]
   + enrollments : Enrollment[]
   + earnAchievement()
@@ -160,5 +191,16 @@ Instruction *-- Achievement
 
 Sandbox o-- Image
 Image o-- File
+WriteUp o-- File
+
+User "1" -- "*" Enrollment
+Training "1" -- "*" Enrollment
+User "1" -- "*" UserSandbox
+Training "1" -- "*" UserSandbox
+User "*" -- "*" Achievement : user_achievements
+User "1" -- "*" InstructionCompletion
+Instruction "1" -- "*" InstructionCompletion
+User "1" -- "*" ChapterCompletion
+Chapter "1" -- "*" ChapterCompletion
 
 @enduml
