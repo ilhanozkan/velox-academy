@@ -1,11 +1,9 @@
-import TrainingsPage from "@/components/Trainings/TrainingsPage";
+import TrainingsPage from "@/components/Catalog/TrainingsPage";
 
 export const metadata = {
   title: "Eğitimler",
 };
 
-const Trainings = async () => {
-  return <TrainingsPage />;
-};
+const Trainings = () => <TrainingsPage />;
 
 export default Trainings;

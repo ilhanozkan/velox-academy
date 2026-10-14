@@ -1,0 +1,8 @@
+.screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+  background: linear-gradient(135deg, var(--mantine-color-primary-9) 0%, var(--mantine-color-brand-1) 100%);
+}

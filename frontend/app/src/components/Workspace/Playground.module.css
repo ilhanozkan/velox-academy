@@ -1,0 +1,67 @@
+.playground {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  background-color: #1e1e1e;
+}
+
+.sidebar {
+  width: 12rem;
+  flex-shrink: 0;
+}
+
+.editorArea {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.tabs {
+  display: flex;
+  overflow-x: auto;
+  background-color: var(--mantine-color-secondary-9);
+  min-height: 2.25rem;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+  padding-right: 0.4rem;
+  color: #c3c9e6;
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+
+  &[data-active] {
+    background-color: #1e1e1e;
+    color: #fff;
+  }
+}
+
+.tabButton {
+  all: unset;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.5rem 0.4rem 0.5rem 0.8rem;
+  font-size: var(--mantine-font-size-sm);
+  cursor: pointer;
+  white-space: nowrap;
+
+  &:focus-visible {
+    outline: 2px solid var(--mantine-color-blue-4);
+  }
+}
+
+.editor {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+.runButton {
+  position: absolute;
+  right: 1rem;
+  bottom: 1.25rem;
+  z-index: 5;
+}

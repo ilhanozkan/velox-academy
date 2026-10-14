@@ -1,0 +1,24 @@
+.button {
+  width: 100%;
+  padding: var(--mantine-spacing-xs) var(--mantine-spacing-sm);
+  border-radius: var(--mantine-radius-md);
+  background-color: var(--mantine-color-soft-0);
+  color: var(--mantine-color-text);
+}
+
+.inner {
+  display: flex;
+  align-items: center;
+  gap: var(--mantine-spacing-xs);
+}
+
+/* min-width: 0 lets long names and e-mails truncate instead of pushing the
+   chevron out of the sidebar. */
+.text {
+  flex: 1;
+  min-width: 0;
+}
+
+.chevron {
+  flex-shrink: 0;
+}

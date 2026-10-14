@@ -1,0 +1,25 @@
+.page {
+  min-height: 100vh;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 2.5rem 1rem;
+  background-color: #fafafa;
+}
+
+.title {
+  font-weight: 700;
+  font-size: 1.6rem;
+  color: var(--mantine-color-brandDark-6);
+}
+
+.logo {
+  width: 12rem;
+  height: auto;
+}
+
+.logoContainer {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1.25rem;
+}

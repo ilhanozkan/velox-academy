@@ -3,6 +3,13 @@ app/node_modules
 
 # Build files
 .next
+app/.next
+
+# Monaco editor copied from node_modules by scripts/copy-monaco.js
+app/public/monaco
+
+# Local environment overrides
+app/.env*.local
 
 # Logs
 app/public/.DS_Store

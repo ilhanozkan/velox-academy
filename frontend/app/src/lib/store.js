@@ -1,16 +1,10 @@
-"use client";
+import { configureStore } from "@reduxjs/toolkit";
 
-import { combineReducers, configureStore } from "@reduxjs/toolkit";
+import authReducer from "./features/auth/authSlice";
 
-// Import slices
-import authSlice from "./features/auth/authSlice";
-import trainingsSlice from "./features/trainings/trainingsSlice";
-
-const rootReducer = combineReducers({
-  auth: authSlice,
-  trainings: trainingsSlice,
-});
-
-export const store = configureStore({
-  reducer: rootReducer,
-});
+export const makeStore = () =>
+  configureStore({
+    reducer: {
+      auth: authReducer,
+    },
+  });
