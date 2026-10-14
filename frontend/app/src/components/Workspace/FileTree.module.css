@@ -1,8 +1,8 @@
 .tree {
   height: 100%;
   overflow-y: auto;
-  background-color: #1b1f3b;
-  color: #dfe3f7;
+  background-color: var(--mantine-color-navy-7);
+  color: var(--mantine-color-navy-0);
   padding-bottom: var(--mantine-spacing-md);
 }
 
@@ -12,7 +12,7 @@
   font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: #9ba3cf;
+  color: var(--mantine-color-navy-2);
 }
 
 .list {
@@ -38,12 +38,12 @@
   }
 
   &:focus-visible {
-    outline: 2px solid var(--mantine-color-blue-4);
+    outline: 2px solid var(--mantine-color-primary-4);
     outline-offset: -2px;
   }
 
   &[data-active] {
-    background-color: rgba(116, 143, 252, 0.22);
+    background-color: rgba(117, 132, 212, 0.25);
     color: #fff;
   }
 }

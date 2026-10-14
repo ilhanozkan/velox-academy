@@ -4,5 +4,7 @@
   align-items: center;
   justify-content: center;
   padding: 2rem 1rem;
-  background: linear-gradient(135deg, var(--mantine-color-primary-9) 0%, var(--mantine-color-brand-1) 100%);
+  background:
+    radial-gradient(circle at 80% 10%, rgba(117, 132, 212, 0.3), transparent 45%),
+    linear-gradient(160deg, var(--mantine-color-navy-9) 0%, var(--mantine-color-primary-6) 100%);
 }

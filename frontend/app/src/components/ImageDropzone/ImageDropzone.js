@@ -9,7 +9,7 @@ export const ImageDropzone = ({ onDrop, description, accept, ...props }) => {
     <Dropzone onDrop={onDrop} maxSize={5 * 1024 ** 2} accept={accept ?? IMAGE_MIME_TYPE} {...props}>
       <Group justify="center" gap="lg" mih={110} style={{ pointerEvents: "none" }}>
         <Dropzone.Accept>
-          <IconUpload style={{ width: rem(40), height: rem(40), color: "var(--mantine-color-blue-6)" }} stroke={1.5} />
+          <IconUpload style={{ width: rem(40), height: rem(40), color: "var(--mantine-color-primary-5)" }} stroke={1.5} />
         </Dropzone.Accept>
         <Dropzone.Reject>
           <IconX style={{ width: rem(40), height: rem(40), color: "var(--mantine-color-red-6)" }} stroke={1.5} />

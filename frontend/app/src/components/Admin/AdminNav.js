@@ -2,35 +2,37 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Tabs } from "@mantine/core";
 import { IconBook, IconChartPie, IconUsers } from "@tabler/icons-react";
 
-const TABS = [
-  { value: "/yonetim", label: "Genel bakış", icon: IconChartPie },
-  { value: "/yonetim/kullanicilar", label: "Kullanıcılar", icon: IconUsers },
-  { value: "/yonetim/egitimler", label: "Eğitimler", icon: IconBook },
+import classes from "./AdminNav.module.css";
+
+const LINKS = [
+  { href: "/yonetim", label: "Genel bakış", icon: IconChartPie },
+  { href: "/yonetim/kullanicilar", label: "Kullanıcılar", icon: IconUsers },
+  { href: "/yonetim/egitimler", label: "Eğitimler", icon: IconBook },
 ];
 
+// Section links that look like tabs. They navigate between pages, so they are
+// links with aria-current rather than ARIA tabs (which need tab panels).
 const AdminNav = () => {
   const pathname = usePathname();
-  const active = [...TABS].reverse().find((tab) => pathname.startsWith(tab.value))?.value;
+  const active = [...LINKS].reverse().find((link) => pathname.startsWith(link.href))?.href;
 
   return (
-    <Tabs value={active} mb="lg">
-      <Tabs.List>
-        {TABS.map((tab) => (
-          <Tabs.Tab
-            key={tab.value}
-            value={tab.value}
-            leftSection={<tab.icon size={16} />}
-            component={Link}
-            href={tab.value}
-          >
-            {tab.label}
-          </Tabs.Tab>
-        ))}
-      </Tabs.List>
-    </Tabs>
+    <nav className={classes.nav} aria-label="Yönetim bölümleri">
+      {LINKS.map(({ href, label, icon: Icon }) => (
+        <Link
+          key={href}
+          href={href}
+          className={classes.link}
+          data-active={href === active || undefined}
+          aria-current={href === active ? "page" : undefined}
+        >
+          <Icon size={16} aria-hidden />
+          {label}
+        </Link>
+      ))}
+    </nav>
   );
 };
 

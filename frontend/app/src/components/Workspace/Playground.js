@@ -1,18 +1,33 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { ActionIcon, Button, Center, Text, Tooltip } from "@mantine/core";
+import { ActionIcon, Button, Center, Drawer, Kbd, Loader, Text, Tooltip } from "@mantine/core";
+import { useDisclosure } from "@mantine/hooks";
 import { notifications } from "@mantine/notifications";
-import { IconPlayerPlay, IconPoint, IconX } from "@tabler/icons-react";
+import {
+  IconAlertTriangle,
+  IconCheck,
+  IconFolders,
+  IconPlayerPlay,
+  IconPoint,
+  IconX,
+} from "@tabler/icons-react";
 
 import { useSocket } from "@/contexts/SocketContext";
-import { getFileMode } from "@/utils/getFileMode";
+import useStoredState from "@/hooks/useStoredState";
+import { modKeyLabel } from "@/lib/platform";
+import { getFileMode, languageLabel } from "@/utils/getFileMode";
 import CodeEditor from "./CodeEditor";
 import FileTree, { flattenTree } from "./FileTree";
+import Splitter from "./Splitter";
 import classes from "./Playground.module.css";
 
 const SAVE_DELAY_MS = 800;
 const ACK_TIMEOUT_MS = 3000;
+
+const TREE_WIDTH = { default: 200, min: 140, max: 420, step: 16 };
+const clampTreeWidth = (width) => Math.min(TREE_WIDTH.max, Math.max(TREE_WIDTH.min, Math.round(width)));
+const sanitizeTreeWidth = (value) => (Number.isFinite(value) ? clampTreeWidth(value) : null);
 
 const fileName = (path) => path.split("/").pop();
 
@@ -32,18 +47,49 @@ const useSandboxFetch = () => {
   );
 };
 
+const SaveStatus = ({ file }) => {
+  if (!file || file.loading || file.error) return null;
+  if (file.saveError)
+    return (
+      <span className={classes.statusItem} data-tone="error">
+        <IconAlertTriangle size={13} aria-hidden /> Kaydedilemedi
+      </span>
+    );
+  if (file.current !== file.saved)
+    return (
+      <span className={classes.statusItem}>
+        <Loader size={10} color="navy.2" aria-hidden /> Kaydediliyor…
+      </span>
+    );
+  return (
+    <span className={classes.statusItem}>
+      <IconCheck size={13} aria-hidden /> Kaydedildi
+    </span>
+  );
+};
+
 /**
  * File explorer, open-file tabs, editor with autosave, and the run button.
  * `onRun(path)` is called after the file has been saved on the sandbox.
+ * Shortcuts: Ctrl/⌘+Enter saves and runs, Ctrl/⌘+S saves.
  */
 const Playground = ({ onRun, running }) => {
   const { socket, isConnected } = useSocket();
   const sandboxFetch = useSandboxFetch();
+  const rootRef = useRef(null);
+  const [treeWidth, setTreeWidth] = useStoredState(
+    "velox.workspace.treeWidth",
+    TREE_WIDTH.default,
+    sanitizeTreeWidth
+  );
+  const [filesOpened, filesDrawer] = useDisclosure(false);
+  const [mod] = useState(modKeyLabel);
 
   const [tree, setTree] = useState({});
+  const [treeLoaded, setTreeLoaded] = useState(false);
   const [openFiles, setOpenFiles] = useState([]);
   const [activeFile, setActiveFile] = useState(null);
-  // path -> { saved, current, loading, error }
+  // path -> { saved, current, loading, error, saveError }
   const [files, setFiles] = useState({});
   const saveTimers = useRef({});
   // path -> content waiting for its autosave
@@ -63,6 +109,8 @@ const Playground = ({ onRun, running }) => {
     } catch (error) {
       console.error("Dosya listesi alınamadı:", error);
       return null;
+    } finally {
+      setTreeLoaded(true);
     }
   }, [sandboxFetch]);
 
@@ -153,20 +201,35 @@ const Playground = ({ onRun, running }) => {
   const save = useCallback(
     (path, content) =>
       new Promise((resolve) => {
-        if (!socket) return resolve(false);
+        const finish = (ok) => {
+          setFiles((current) =>
+            current[path]
+              ? {
+                  ...current,
+                  [path]: { ...current[path], saveError: !ok, ...(ok && { saved: content }) },
+                }
+              : current
+          );
+          resolve(ok);
+        };
 
-        const timeout = setTimeout(() => resolve(false), ACK_TIMEOUT_MS);
+        if (!socket) return finish(false);
+
+        const timeout = setTimeout(() => finish(false), ACK_TIMEOUT_MS);
         socket.emit("file:change", { path, content }, (ack) => {
           clearTimeout(timeout);
-          if (ack?.ok)
-            setFiles((current) =>
-              current[path] ? { ...current, [path]: { ...current[path], saved: content } } : current
-            );
-          resolve(Boolean(ack?.ok));
+          finish(Boolean(ack?.ok));
         });
       }),
     [socket]
   );
+
+  // Timers call the latest `save`: after a reconnect the one captured when
+  // typing would still use the old, closed socket.
+  const saveRef = useRef(save);
+  useEffect(() => {
+    saveRef.current = save;
+  }, [save]);
 
   const handleChange = (content) => {
     const path = activeFile;
@@ -176,7 +239,7 @@ const Playground = ({ onRun, running }) => {
     pendingSaves.current[path] = content;
     saveTimers.current[path] = setTimeout(() => {
       delete pendingSaves.current[path];
-      save(path, content);
+      saveRef.current(path, content);
     }, SAVE_DELAY_MS);
   };
 
@@ -220,29 +283,112 @@ const Playground = ({ onRun, running }) => {
     [modelScope]
   );
 
-  const handleEditorMount = useCallback((editor, monaco) => {
-    monacoRef.current = monaco;
-  }, []);
+  const saveNow = useCallback(async () => {
+    if (!activeFile) return true;
+    const file = files[activeFile];
+    clearTimeout(saveTimers.current[activeFile]);
+    delete pendingSaves.current[activeFile];
+    if (file && !file.loading && (file.current !== file.saved || file.saveError))
+      return save(activeFile, file.current);
+    return true;
+  }, [activeFile, files, save]);
+
+  // A run starts with a save that can wait up to ACK_TIMEOUT_MS for the
+  // sandbox; `busy` (a ref, so repeated clicks and shortcuts see it at once)
+  // stays set until that run has finished.
+  const busyRef = useRef(false);
+  const runToken = useRef(0);
+  const [starting, setStarting] = useState(false);
+  const wasRunning = useRef(false);
+  useEffect(() => {
+    if (running) wasRunning.current = true;
+    else if (wasRunning.current) {
+      wasRunning.current = false;
+      busyRef.current = false;
+    }
+  }, [running]);
 
   // Save first, then run; the old button could run the previous version of a
   // file edited less than a second ago. If the save fails, running would show
   // the output of the old version, so stop.
   const run = useCallback(async () => {
-    if (!activeFile || !socket) return;
-    const file = files[activeFile];
-
-    clearTimeout(saveTimers.current[activeFile]);
-    delete pendingSaves.current[activeFile];
-    if (file && file.current !== file.saved && !(await save(activeFile, file.current))) {
-      notifications.show({
-        color: "red",
-        title: "Dosya kaydedilemedi",
-        message: "Değişiklikleriniz sanal makineye kaydedilemediği için dosya çalıştırılmadı. Bağlantıyı kontrol edip tekrar deneyin.",
-      });
-      return;
+    if (!activeFile || !socket || !isConnected || running || busyRef.current) return;
+    busyRef.current = true;
+    const token = ++runToken.current;
+    setStarting(true);
+    try {
+      if (!(await saveNow())) {
+        busyRef.current = false;
+        notifications.show({
+          color: "red",
+          title: "Dosya kaydedilemedi",
+          message: "Değişiklikleriniz sanal makineye kaydedilemediği için dosya çalıştırılmadı. Bağlantıyı kontrol edip tekrar deneyin.",
+        });
+        return;
+      }
+      onRun(activeFile);
+      // Fallback if `running` never showed as true (start and result in one
+      // render): do not leave the run button blocked.
+      setTimeout(() => {
+        if (runToken.current === token && !wasRunning.current) busyRef.current = false;
+      }, 1000);
+    } finally {
+      setStarting(false);
     }
-    onRun(activeFile);
-  }, [activeFile, files, onRun, save, socket]);
+  }, [activeFile, isConnected, onRun, running, saveNow, socket]);
+
+  // Shortcuts read the latest callbacks through refs: Monaco actions are
+  // registered once per editor.
+  const runRef = useRef(run);
+  const saveNowRef = useRef(saveNow);
+  useEffect(() => {
+    runRef.current = run;
+    saveNowRef.current = saveNow;
+  });
+
+  // Actions (unlike addCommand) can be disposed: the editor is recreated
+  // when a file is loading, and each one would leave keybindings behind.
+  const handleEditorMount = useCallback((editor, monaco) => {
+    monacoRef.current = monaco;
+    const actions = [
+      editor.addAction({
+        id: "velox.run",
+        label: "Kaydet ve çalıştır",
+        keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter],
+        run: () => runRef.current(),
+      }),
+      editor.addAction({
+        id: "velox.save",
+        label: "Kaydet",
+        keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS],
+        run: () => saveNowRef.current(),
+      }),
+    ];
+    editor.onDidDispose(() => actions.forEach((action) => action.dispose()));
+  }, []);
+
+  // The same shortcuts outside the editor (instructions, results). The
+  // terminal keeps Ctrl+S / Ctrl+Enter for the shell; dialogs, links and form
+  // fields keep their own meaning (Ctrl+Enter on a link opens a new tab).
+  useEffect(() => {
+    const onKeyDown = (event) => {
+      if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
+      const target = event.target instanceof Element ? event.target : null;
+      if (target?.closest(".xterm, .monaco-editor, [role=dialog], a[href], input, textarea, select, [contenteditable]"))
+        return;
+      const isRun = event.key === "Enter";
+      const isSave = event.key === "s" || event.key === "S";
+      if (!isRun && !isSave) return;
+
+      event.preventDefault();
+      // Holding the keys down must not start a run per repeated keydown.
+      if (event.repeat) return;
+      if (isRun) runRef.current();
+      else saveNowRef.current();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   const closeFile = (path) => {
     setOpenFiles((current) => {
@@ -252,44 +398,113 @@ const Playground = ({ onRun, running }) => {
     });
   };
 
+  const selectFromDrawer = (path) => {
+    openFile(path);
+    filesDrawer.close();
+  };
+
+  const resizeTree = (clientX) => {
+    const rect = rootRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    // Same limit as the CSS max-width: the editor keeps 16rem (256 px).
+    setTreeWidth(Math.min(clampTreeWidth(clientX - rect.left), Math.max(TREE_WIDTH.min, rect.width - 256)));
+  };
+
   const active = activeFile ? files[activeFile] : null;
+  const language = activeFile ? getFileMode({ selectedFile: activeFile }) : null;
+  const canRun = Boolean(activeFile) && isConnected;
+
+  const fileTree = (onSelect, showTitle) =>
+    treeLoaded ? (
+      <FileTree tree={tree} selected={activeFile} onSelect={onSelect} showTitle={showTitle} />
+    ) : (
+      <Center h={120}>
+        <Loader size="sm" color="navy.2" />
+      </Center>
+    );
 
   return (
-    <div className={classes.playground}>
-      <div className={classes.sidebar}>
-        <FileTree tree={tree} selected={activeFile} onSelect={openFile} />
+    <div className={classes.playground} ref={rootRef}>
+      <div className={classes.sidebar} style={{ width: treeWidth }}>
+        {fileTree(openFile, true)}
       </div>
+      <Splitter
+        className={classes.treeSplitter}
+        label="Dosya listesinin genişliği"
+        value={treeWidth}
+        min={TREE_WIDTH.min}
+        max={TREE_WIDTH.max}
+        onDrag={resizeTree}
+        onStep={(direction) => setTreeWidth((width) => clampTreeWidth(width + direction * TREE_WIDTH.step))}
+        onReset={() => setTreeWidth(TREE_WIDTH.default)}
+      />
 
       <div className={classes.editorArea}>
-        <div className={classes.tabs} role="tablist" aria-label="Açık dosyalar">
-          {openFiles.map((path) => {
-            const file = files[path];
-            const dirty = file && file.current !== file.saved;
-            return (
-              <div key={path} className={classes.tab} data-active={path === activeFile || undefined}>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={path === activeFile}
-                  className={classes.tabButton}
-                  onClick={() => setActiveFile(path)}
-                  title={path}
-                >
-                  {fileName(path)}
-                  {dirty ? <IconPoint size={14} aria-label="kaydedilmedi" /> : null}
-                </button>
-                <ActionIcon
-                  size="xs"
-                  variant="transparent"
-                  color="gray"
-                  onClick={() => closeFile(path)}
-                  aria-label={`${fileName(path)} dosyasını kapat`}
-                >
-                  <IconX size={12} />
-                </ActionIcon>
-              </div>
-            );
-          })}
+        <div className={classes.toolbar}>
+          <ActionIcon
+            hiddenFrom="sm"
+            variant="subtle"
+            color="navy.1"
+            size="lg"
+            radius={0}
+            className={classes.filesButton}
+            onClick={filesDrawer.open}
+            aria-label="Dosyaları göster"
+          >
+            <IconFolders size={18} />
+          </ActionIcon>
+
+          {/* Plain buttons, not ARIA tabs: each entry also has a close button. */}
+          <div className={classes.tabs} role="group" aria-label="Açık dosyalar">
+            {openFiles.map((path) => {
+              const file = files[path];
+              const dirty = file && file.current !== file.saved;
+              return (
+                <div key={path} className={classes.tab} data-active={path === activeFile || undefined}>
+                  <button
+                    type="button"
+                    aria-current={path === activeFile ? "true" : undefined}
+                    className={classes.tabButton}
+                    onClick={() => setActiveFile(path)}
+                    title={path}
+                  >
+                    {fileName(path)}
+                    {dirty ? <IconPoint size={14} aria-label="kaydedilmedi" /> : null}
+                  </button>
+                  <ActionIcon
+                    size="xs"
+                    variant="transparent"
+                    color="navy.2"
+                    onClick={() => closeFile(path)}
+                    aria-label={`${fileName(path)} dosyasını kapat`}
+                  >
+                    <IconX size={12} />
+                  </ActionIcon>
+                </div>
+              );
+            })}
+          </div>
+
+          <Tooltip
+            label={
+              <>
+                Kaydet ve çalıştır <Kbd size="xs">{mod}</Kbd> + <Kbd size="xs">Enter</Kbd>
+              </>
+            }
+            position="bottom-end"
+          >
+            <Button
+              className={classes.runButton}
+              size="xs"
+              color="teal"
+              leftSection={<IconPlayerPlay size={14} />}
+              onClick={run}
+              loading={running || starting}
+              disabled={!canRun}
+            >
+              Çalıştır
+            </Button>
+          </Tooltip>
         </div>
 
         <div className={classes.editor}>
@@ -301,32 +516,48 @@ const Playground = ({ onRun, running }) => {
             ) : (
               <CodeEditor
                 path={`/${modelScope}${activeFile}`}
-                language={getFileMode({ selectedFile: activeFile })}
+                fileName={fileName(activeFile)}
+                language={language}
                 value={active.current}
                 onChange={handleChange}
                 onMount={handleEditorMount}
               />
             )
-          ) : (
+          ) : active?.loading ? (
             <Center h="100%">
-              <Text c="dimmed">Soldaki listeden bir dosya açın.</Text>
+              <Loader color="navy.2" size="sm" />
+            </Center>
+          ) : (
+            <Center h="100%" px="md">
+              <Text c="navy.2" ta="center">
+                {treeLoaded && !flattenTree(tree).length
+                  ? "Çalışma alanında henüz dosya yok. Terminalden bir dosya oluşturabilirsiniz."
+                  : "Düzenlemek için listeden bir dosya açın."}
+              </Text>
             </Center>
           )}
+        </div>
 
-          <Tooltip label="Dosyayı kaydet ve çalıştır" withArrow position="left">
-            <Button
-              className={classes.runButton}
-              leftSection={<IconPlayerPlay size={18} />}
-              onClick={run}
-              loading={running}
-              disabled={!activeFile || !isConnected}
-              size="md"
-            >
-              Çalıştır
-            </Button>
-          </Tooltip>
+        <div className={classes.statusBar}>
+          {language ? <span className={classes.statusItem}>{languageLabel(language)}</span> : null}
+          <SaveStatus file={active} />
+          <span className={classes.shortcuts}>
+            <Kbd size="xs">{mod}</Kbd>+<Kbd size="xs">Enter</Kbd> çalıştır · <Kbd size="xs">{mod}</Kbd>+
+            <Kbd size="xs">S</Kbd> kaydet
+          </span>
         </div>
       </div>
+
+      <Drawer
+        opened={filesOpened}
+        onClose={filesDrawer.close}
+        title="Dosyalar"
+        position="left"
+        size="80%"
+        classNames={{ content: classes.drawerContent, header: classes.drawerHeader, body: classes.drawerBody }}
+      >
+        {fileTree(selectFromDrawer, false)}
+      </Drawer>
     </div>
   );
 };

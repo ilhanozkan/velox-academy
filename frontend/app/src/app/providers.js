@@ -8,7 +8,7 @@ import { Notifications } from "@mantine/notifications";
 
 import { makeStore } from "@/lib/store";
 import { fetchProfile } from "@/lib/features/auth/authSlice";
-import { theme } from "@/app/theme/theme";
+import { cssVariablesResolver, theme } from "@/app/theme/theme";
 
 // Checks the session once when the app loads.
 const AuthBootstrap = ({ children }) => {
@@ -28,7 +28,7 @@ const Providers = ({ children }) => {
 
   return (
     <Provider store={storeRef.current}>
-      <MantineProvider theme={theme}>
+      <MantineProvider theme={theme} cssVariablesResolver={cssVariablesResolver}>
         <ModalsProvider labels={{ confirm: "Onayla", cancel: "İptal Et" }}>
           <Notifications position="top-right" />
           <AuthBootstrap>{children}</AuthBootstrap>

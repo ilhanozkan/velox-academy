@@ -25,7 +25,13 @@ const Terminal = ({ active }) => {
       cursorBlink: true,
       fontSize: 13,
       fontFamily: "Menlo, 'DejaVu Sans Mono', monospace",
-      theme: { background: "#1e1e1e" },
+      // navy.8 / navy.0 from the theme, like the editor.
+      theme: {
+        background: "#121738",
+        foreground: "#e6e8f4",
+        cursor: "#95a1de",
+        selectionBackground: "#34408f",
+      },
     });
     const fit = new FitAddon();
     term.loadAddon(fit);

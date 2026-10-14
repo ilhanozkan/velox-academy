@@ -1,0 +1,26 @@
+.splitter {
+  position: relative;
+  flex: 0 0 5px;
+  cursor: col-resize;
+  background-color: var(--mantine-color-navy-6);
+  touch-action: none;
+  z-index: 2;
+  transition: background-color 120ms ease;
+
+  /* Wider invisible hit area. */
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0 -4px;
+  }
+
+  &:hover,
+  &:focus-visible,
+  &:active {
+    background-color: var(--mantine-color-primary-4);
+  }
+
+  &:focus-visible {
+    outline: none;
+  }
+}

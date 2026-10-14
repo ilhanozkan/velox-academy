@@ -1,0 +1,46 @@
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--mantine-spacing-sm);
+  align-items: center;
+  margin-bottom: var(--mantine-spacing-lg);
+}
+
+.search {
+  flex: 1 1 16rem;
+}
+
+.category {
+  flex: 0 1 13rem;
+
+  @mixin smaller-than $mantine-breakpoint-sm {
+    flex: 1 1 10rem;
+  }
+}
+
+.status {
+  background-color: var(--mantine-color-white);
+  border: 1px solid var(--mantine-color-gray-3);
+}
+
+.statusSelect {
+  flex: 1 1 10rem;
+}
+
+.clear {
+  all: unset;
+  display: flex;
+  padding: 0.25rem;
+  border-radius: var(--mantine-radius-sm);
+  color: var(--mantine-color-gray-6);
+  cursor: pointer;
+
+  &:hover {
+    color: var(--mantine-color-gray-8);
+    background-color: var(--mantine-color-gray-1);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--mantine-color-primary-5);
+  }
+}

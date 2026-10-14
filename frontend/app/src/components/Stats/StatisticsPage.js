@@ -116,7 +116,7 @@ const StatisticsPage = () => {
       <PageHeader title="İstatistikler" description="Öğrenme yolculuğunuzun özeti" />
 
       <SimpleGrid cols={{ base: 1, xs: 2, md: 4 }} mb="lg">
-        <StatCard icon={IconBook2} label="Kayıtlı eğitim" value={totals.enrolledTrainings} color="blue" />
+        <StatCard icon={IconBook2} label="Kayıtlı eğitim" value={totals.enrolledTrainings} color="primary.5" />
         <StatCard icon={IconCertificate} label="Tamamlanan eğitim" value={totals.completedTrainings} color="teal" />
         <StatCard icon={IconCircleCheck} label="Tamamlanan adım" value={totals.completedInstructions} color="violet" />
         <StatCard icon={IconStar} label="Puan" value={totals.points} color="yellow" />
@@ -132,7 +132,7 @@ const StatisticsPage = () => {
               h={220}
               data={activity.map((d) => ({ gün: dayLabel(d.day), Adım: d.count }))}
               dataKey="gün"
-              series={[{ name: "Adım", color: "blue.6" }]}
+              series={[{ name: "Adım", color: "primary.5" }]}
               tickLine="none"
               gridAxis="y"
               yAxisProps={{ allowDecimals: false }}
@@ -161,7 +161,7 @@ const StatisticsPage = () => {
                   </Group>
                   <Progress
                     value={training.progress.percent}
-                    color={training.completed ? "teal" : "blue"}
+                    color={training.completed ? "teal" : "primary.5"}
                     aria-label={`${training.name} ilerlemesi`}
                   />
                 </div>

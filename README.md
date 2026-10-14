@@ -311,9 +311,14 @@ The backend provides RESTful APIs for the following areas; see
 
 ### User Experience
 
-- Modern, responsive UI with Mantine components
-- Code editor with syntax highlighting, autosave and open-file tabs
+- Modern, responsive UI with Mantine components and a consistent color system
+- Catalog search with category and status filters, and a "continue where you left off" shortcut
+- Code editor with syntax highlighting, autosave, open-file tabs and a save indicator
+- Keyboard shortcuts: `Ctrl/⌘ + Enter` saves and runs the file, `Ctrl/⌘ + S` saves
+- Resizable workspace panes (remembered per browser); on phones the workspace
+  switches between instructions, code, results and terminal
 - Query results as tables, readable program and SQL errors
+- Accessible: WCAG AA color contrast, visible focus, a skip link, keyboard-resizable panes
 
 ---
 

@@ -1,0 +1,54 @@
+.banner {
+  display: flex;
+  align-items: center;
+  gap: var(--mantine-spacing-lg);
+  margin-bottom: var(--mantine-spacing-xl);
+  padding: var(--mantine-spacing-md);
+  padding-right: var(--mantine-spacing-xl);
+  border-radius: var(--mantine-radius-lg);
+  background:
+    radial-gradient(circle at 90% 0%, rgba(117, 132, 212, 0.35), transparent 50%),
+    linear-gradient(120deg, var(--mantine-color-primary-9), var(--mantine-color-primary-6));
+  box-shadow: var(--mantine-shadow-md);
+
+  @mixin smaller-than $mantine-breakpoint-sm {
+    flex-direction: column;
+    align-items: stretch;
+    padding: var(--mantine-spacing-md);
+  }
+}
+
+.image {
+  width: 11rem;
+  aspect-ratio: 16 / 9;
+  flex-shrink: 0;
+  border-radius: var(--mantine-radius-md);
+  object-fit: cover;
+
+  @mixin smaller-than $mantine-breakpoint-sm {
+    display: none;
+  }
+}
+
+.body {
+  flex: 1;
+  min-width: 0;
+}
+
+.eyebrow {
+  color: var(--mantine-color-primary-2);
+  letter-spacing: 0.04em;
+}
+
+.progress {
+  flex: 1;
+  background-color: rgba(255, 255, 255, 0.15);
+}
+
+.meta {
+  color: var(--mantine-color-primary-1);
+}
+
+.action {
+  flex-shrink: 0;
+}

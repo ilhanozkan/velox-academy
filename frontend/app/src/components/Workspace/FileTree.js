@@ -73,9 +73,9 @@ const Node = ({ name, nodes, path, depth, selected, onSelect }) => {
  * Sandbox file explorer. Paths are absolute within the workspace ("/a/b.sql");
  * nested paths used to be joined without a separator ("dirfile.sql").
  */
-const FileTree = ({ tree, selected, onSelect }) => (
+const FileTree = ({ tree, selected, onSelect, showTitle = true }) => (
   <nav className={classes.tree} aria-label="Dosyalar">
-    <div className={classes.title}>Dosyalar</div>
+    {showTitle ? <div className={classes.title}>Dosyalar</div> : null}
     <ul className={classes.list}>
       {sortEntries(tree).map((name) => (
         <Node

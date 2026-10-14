@@ -72,7 +72,7 @@ const LoginForm = ({ next }) => {
           {...form.getInputProps("password")}
         />
 
-        <Button type="submit" fullWidth mt="xl" radius="md" loading={submitting}>
+        <Button type="submit" fullWidth mt="xl" size="md" loading={submitting}>
           Giriş Yap
         </Button>
       </form>
