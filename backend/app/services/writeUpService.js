@@ -1,6 +1,14 @@
 const WriteUp = require("../models/WriteUp");
+const { notFound } = require("../utils/httpError");
+
+// Columns an admin may set on a write-up.
+const WRITE_UP_FIELDS = ["id", "title", "file_path", "file_id", "chapter_id"];
 
 class WriteUpService {
+  static get FIELDS() {
+    return WRITE_UP_FIELDS;
+  }
+
   static async getAllWriteUps() {
     return await WriteUp.query();
   }
@@ -14,11 +22,15 @@ class WriteUpService {
   }
 
   static async updateWriteUp(id, writeUpData) {
-    return await WriteUp.query().patchAndFetchById(id, writeUpData);
+    const { id: _ignored, ...changes } = writeUpData;
+    const writeUp = await WriteUp.query().patchAndFetchById(id, changes);
+    if (!writeUp) throw notFound("Yazı bulunamadı");
+    return writeUp;
   }
 
   static async deleteWriteUp(id) {
-    await WriteUp.query().deleteById(id);
+    const deleted = await WriteUp.query().deleteById(id);
+    if (!deleted) throw notFound("Yazı bulunamadı");
   }
 
   // Business logic methods based on UML diagram
@@ -27,22 +39,17 @@ class WriteUpService {
       .findById(writeUpId)
       .withGraphFetched("file");
 
-    if (!writeUp) {
-      throw new Error("Write-up not found");
-    }
+    if (!writeUp) throw notFound("Yazı bulunamadı");
 
-    if (!writeUp.file) {
-      throw new Error("File not found for this write-up");
-    }
+    // Write-ups either reference a files row or store their path directly.
+    const filePath = writeUp.file?.file_path || writeUp.file_path;
 
-    // In a real implementation, this would handle file download
-    // For now, we'll return file information
     return {
       writeUpId: writeUp.id,
       file: writeUp.file,
-      downloadUrl: `/api/files/${writeUp.file.id}/download`,
-      contentType: writeUp.file.type,
-      filename: writeUp.file.name,
+      downloadUrl: `/static/${filePath.replace(/^\/+/, "")}`,
+      contentType: writeUp.file?.file_type || null,
+      filename: writeUp.file?.name || filePath.split("/").pop(),
     };
   }
 }

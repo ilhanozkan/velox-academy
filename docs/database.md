@@ -105,8 +105,8 @@ training/instruction/chapter/achievement.
 | an instruction | its completions are deleted; achievements stay (instruction is set to `NULL`) |
 | a category | its trainings stay uncategorised (`category_id` is set to `NULL`) |
 
-Deleting a training removes the `user_sandboxes` rows, not the cloud VMs
-behind them.
+Deleting a training or a user removes the `user_sandboxes` rows; the API
+deletes the cloud VMs behind them first.
 
 ## Migrations
 

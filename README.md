@@ -115,11 +115,17 @@ cd velox-academy
    make dev
    ```
 
-4. **Start VM Service (for creating example SQL sandboxes images)**
+4. **Start the sandbox service** (the code learners run in, with the sample MySQL database)
    ```bash
    cd vm-image/.docker.dev
    docker compose up -d
    ```
+
+   In development the API uses the `local` sandbox provider: every learner is
+   connected to this service on `http://localhost:9000`, so no Google Cloud
+   account is needed. This compose file sets `ALLOW_NO_TOKEN=true`; to require
+   a token instead, start both compose projects with the same `SANDBOX_TOKEN`
+   environment variable.
 
 ### Running Locally
 
@@ -133,7 +139,9 @@ cd velox-academy
 
    ```bash
    cd backend/app
-   npm start
+   cp .env.example .env   # optional, every variable has a development default
+   npm install
+   npm run dev
    ```
 
 3. **Start Frontend**
@@ -143,11 +151,27 @@ cd velox-academy
    npm run dev
    ```
 
-4. **Start VM Service**
+4. **Start VM Service** (needs MySQL with `vm-image/database/sample.sql` loaded)
    ```bash
    cd vm-image
-   npm run dev
+   ALLOW_NO_TOKEN=true npm run dev   # or SANDBOX_TOKEN=... matching the API's LOCAL_SANDBOX_TOKEN
    ```
+
+   Without a token (from `SANDBOX_TOKEN` or the VM's metadata) the service
+   refuses every connection unless `ALLOW_NO_TOKEN=true`.
+
+### Running the tests
+
+The backend tests run against a real PostgreSQL database (`velox_test`, created
+and reset automatically):
+
+```bash
+cd backend/app
+DB_HOST=localhost npm test
+```
+
+CI (`.github/workflows/ci.yml`) runs them on every pull request, together with
+the migration checks.
 
 ## 🔧 Configuration
 
@@ -155,11 +179,21 @@ cd velox-academy
 
 Create `.env` files in the respective directories:
 
-**Backend (`backend/app/.env`)**:
+**Backend (`backend/app/.env`)** — copy `backend/app/.env.example`, which
+documents every variable. The important ones:
 
 ```env
+# Required in production (generate with `openssl rand -hex 32`)
 JWT_SECRET=your-jwt-secret
+# Origins allowed to call the API with cookies
+CORS_ORIGINS=http://localhost:3000
+# gcp | local | disabled (default: local in development, gcp in production)
+SANDBOX_PROVIDER=local
+LOCAL_SANDBOX_URL=http://localhost:9000
 ```
+
+`.env` is not committed: the previously committed `JWT_SECRET` must be
+considered public, so set a new one in every deployed environment.
 
 **Frontend (`frontend/app/.env.local`)**:
 
@@ -172,11 +206,22 @@ NEXT_PUBLIC_API_URL=http://app:5001
 
 ### Google Cloud Setup
 
+Only needed for `SANDBOX_PROVIDER=gcp`, which creates one Compute Engine VM per
+learner and training from an instance template.
+
 1. Create a Google Cloud Project
 2. Enable Compute Engine API
 3. Create a service account with appropriate permissions
 4. Download credentials JSON file
 5. Place credentials in `backend/app/application_default_credentials.json`
+6. Build the sandbox image from `vm-image/` and create an instance template
+   from it; set `GCP_PROJECT_ID`, `GCP_ZONE` and `GCP_INSTANCE_TEMPLATE`
+   (a training can override the template with its `sandbox_template` column).
+
+Each VM receives a random access token through the `velox-sandbox-token`
+instance metadata key, and the sandbox service refuses connections without it.
+Rebuild the image from the current `vm-image/` code to enable this check (and
+do not set `ALLOW_NO_TOKEN` on VMs).
 
 ## 📊 Database Schema
 
@@ -208,17 +253,32 @@ Existing installations keep this account: change its password after upgrading.
 
 ## 🔗 API Endpoints
 
-The backend provides RESTful APIs for:
+The backend provides RESTful APIs for the following areas; see
+[docs/api.md](docs/api.md) for every route, its access level and payloads.
 
-- `/api/auth` - Authentication (login, register, logout)
-- `/api/users` - User management
-- `/api/categories` - Course categories
-- `/api/trainings` - Course management
-- `/api/chapters` - Chapter content
-- `/api/instructions` - Learning instructions
-- `/api/sandboxes` - Virtual environments
-- `/api/achievements` - Progress tracking
-- `/api/admin` - Administrative functions
+- `/api/auth` - Registration, login, logout, profile and password
+- `/api/trainings` - Catalog, curriculum with progress, enrollment and sandboxes
+- `/api/instructions`, `/api/chapters` - Content and completion tracking
+- `/api/users` - Accounts, statistics, achievements and avatars
+- `/api/user-sandboxes` - The learner's sandbox VMs
+- `/api/categories`, `/api/achievements`, `/api/writeups`, `/api/sandboxes`, `/api/images` - Content
+- `/api/admin` - Dashboard statistics, user management and content management
+- `/api/health` - Health check
+
+### Security
+
+- Sessions use an `httpOnly`, `SameSite=Lax` cookie (`Secure` in production);
+  `Authorization: Bearer` is accepted for API clients.
+- Every write to course content and every `/api/admin` route requires the
+  `admin` role; users can only read and change their own account.
+- Blocking a user or changing a role takes effect on the next request.
+- Login, registration and password changes are rate limited per IP.
+- Uploads are restricted to images with random file names; file names in
+  requests cannot escape the images directory.
+- Sandbox VMs require a per-sandbox access token and refuse all connections
+  when they have none.
+- Changing a password ends the account's other sessions; state-changing
+  requests from origins outside `CORS_ORIGINS` are rejected.
 
 ## 🎯 Key Features
 

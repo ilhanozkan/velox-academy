@@ -1,70 +1,32 @@
 const express = require("express");
-const jwt = require("jsonwebtoken");
+const rateLimit = require("express-rate-limit");
 
-const User = require("../models/User");
-const authMiddleware = require("../utils/authMiddleware");
+const config = require("../config/env");
+const AuthController = require("../controllers/authController");
+const { requireAuth } = require("../middleware/auth");
 const router = express.Router();
 
-// Kayıt ol
-router.post("/register", async (req, res) => {
-  try {
-    const { username, email, password } = req.body;
-    const user = await User.query().insert({ username, email, password });
-    res.status(201).json({ message: "Kayıt başarılı", user });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Sunucu hatası" });
-  }
+// Slows down password guessing and mass registration.
+const credentialsLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: config.auth.rateLimitMax,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: { error: "Çok fazla deneme yaptınız. Lütfen birkaç dakika sonra tekrar deneyin." },
 });
+
+// Kayıt ol
+router.post("/register", credentialsLimiter, AuthController.register);
 
 // Giriş yap
-router.post("/login", async (req, res) => {
-  try {
-    const { email, password } = req.body;
-    const user = await User.query().findOne({ email });
+router.post("/login", credentialsLimiter, AuthController.login);
 
-    if (!user)
-      return res
-        .status(401)
-        .json({ error: "Geçersiz kullanıcı adı veya şifre" });
-
-    const validPassword = await user.verifyPassword(password);
-
-    if (!validPassword)
-      return res
-        .status(401)
-        .json({ error: "Geçersiz kullanıcı adı veya şifre" });
-
-    const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, {
-      expiresIn: "24h",
-    });
-
-    // Set token as a cookie
-    res.cookie("token", token, {
-      maxAge: 86400000, // 24 hours
-      // httpOnly: true, // Prevents XSS attacks
-      // secure: process.env.NODE_ENV === "production", // HTTPS only in production
-      // sameSite: "lax", // CSRF protection
-    });
-
-    res.status(200).json({ token });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Sunucu hatası" });
-  }
-});
+// Çıkış yap (httpOnly cookie can only be cleared by the server)
+router.post("/logout", AuthController.logout);
 
 // Profil
-router.get("/profile", authMiddleware, async (req, res) => {
-  try {
-    console.log(req);
-
-    const user = await User.query().findById(req.user.userId);
-    res.status(200).json({ user });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Sunucu hatası" });
-  }
-});
+router.get("/profile", requireAuth, AuthController.profile);
+router.patch("/profile", requireAuth, AuthController.updateProfile);
+router.post("/change-password", requireAuth, credentialsLimiter, AuthController.changePassword);
 
 module.exports = router;

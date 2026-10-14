@@ -1,8 +1,18 @@
 const Chapter = require("../models/Chapter");
+const { notFound } = require("../utils/httpError");
+const ProgressService = require("./progressService");
+const UserSandboxService = require("./userSandboxService");
+
+// Columns an admin may set on a chapter.
+const CHAPTER_FIELDS = ["id", "name", "description", "training_id", "position"];
 
 class ChapterService {
+  static get FIELDS() {
+    return CHAPTER_FIELDS;
+  }
+
   static async getAllChapters() {
-    return await Chapter.query();
+    return await Chapter.query().orderBy(["training_id", "position"]);
   }
 
   static async getChapterById(id) {
@@ -10,27 +20,32 @@ class ChapterService {
   }
 
   static async createChapter(chapterData) {
+    // New chapters go to the end of the training unless a position is given.
+    if (chapterData.position === undefined && chapterData.training_id) {
+      const { max } = await Chapter.query()
+        .where("training_id", chapterData.training_id)
+        .max("position as max")
+        .first();
+      chapterData = { ...chapterData, position: (max || 0) + 1 };
+    }
     return await Chapter.query().insert(chapterData);
   }
 
   static async updateChapter(id, chapterData) {
-    return await Chapter.query().patchAndFetchById(id, chapterData);
+    const { id: _ignored, ...changes } = chapterData;
+    const chapter = await Chapter.query().patchAndFetchById(id, changes);
+    if (!chapter) throw notFound("Bölüm bulunamadı");
+    return chapter;
   }
 
   static async deleteChapter(id) {
-    await Chapter.query().deleteById(id);
+    const deleted = await Chapter.query().deleteById(id);
+    if (!deleted) throw notFound("Bölüm bulunamadı");
   }
 
   // Business logic methods based on UML diagram
   static async completeChapter(chapterId, userId) {
-    // This would typically update user's progress
-    // For now, we'll return a success response
-    return {
-      chapterId,
-      userId,
-      completedAt: new Date(),
-      status: "completed",
-    };
+    return await ProgressService.completeChapter(userId, chapterId);
   }
 
   static async getWriteUps(chapterId) {
@@ -48,52 +63,26 @@ class ChapterService {
   }
 
   static async findInstruction(chapterId, instructionId) {
-    const chapter = await Chapter.query()
-      .findById(chapterId)
-      .withGraphFetched("instructions");
-
-    if (!chapter || !chapter.instructions) {
-      return null;
-    }
-
-    return chapter.instructions.find(
-      (instruction) => instruction.id === instructionId
-    );
+    const instructions = await this.getInstructions(chapterId);
+    return instructions.find((instruction) => instruction.id === instructionId) || null;
   }
 
-  static async startSandbox(chapterId) {
-    const chapter = await Chapter.query()
-      .findById(chapterId)
-      .withGraphFetched("sandbox");
+  // A chapter runs in the learner's sandbox for its training: starting it
+  // provisions that sandbox if needed, stopping it releases the VM.
+  static async startSandbox(chapterId, userId) {
+    const chapter = await Chapter.query().findById(chapterId);
+    if (!chapter) throw notFound("Bölüm bulunamadı");
 
-    if (!chapter || !chapter.sandbox) {
-      throw new Error("Sandbox not found for this chapter");
-    }
-
-    // In a real implementation, this would start the sandbox environment
-    // For now, we'll return sandbox information
-    return {
-      ...chapter.sandbox,
-      status: "starting",
-      startedAt: new Date(),
-    };
+    await ProgressService.requireEnrollment(userId, chapter.training_id);
+    const sandbox = await UserSandboxService.ensureSandbox(userId, chapter.training_id);
+    return UserSandboxService.serialize(sandbox, { includeToken: true });
   }
 
-  static async stopSandbox(chapterId) {
-    const chapter = await Chapter.query()
-      .findById(chapterId)
-      .withGraphFetched("sandbox");
+  static async stopSandbox(chapterId, userId) {
+    const chapter = await Chapter.query().findById(chapterId);
+    if (!chapter) throw notFound("Bölüm bulunamadı");
 
-    if (!chapter || !chapter.sandbox) {
-      throw new Error("Sandbox not found for this chapter");
-    }
-
-    // In a real implementation, this would stop the sandbox environment
-    return {
-      ...chapter.sandbox,
-      status: "stopped",
-      stoppedAt: new Date(),
-    };
+    return await UserSandboxService.deleteUserSandbox(userId, chapter.training_id);
   }
 }
 

@@ -1,153 +1,68 @@
 const ChapterService = require("../services/chapterService");
+const { notFound, pick, wrapController } = require("../utils/httpError");
 
 class ChapterController {
   static async getAllChapters(req, res) {
-    try {
-      const chapters = await ChapterService.getAllChapters();
-      res.status(200).json({ chapters });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: "Sunucu hatası" });
-    }
+    const chapters = await ChapterService.getAllChapters();
+    res.status(200).json({ chapters });
   }
 
   static async getChapterById(req, res) {
-    try {
-      const { id } = req.params;
-      const chapter = await ChapterService.getChapterById(id);
-      if (!chapter) {
-        return res.status(404).json({ error: "Bölüm bulunamadı" });
-      }
-      res.status(200).json({ chapter });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: "Sunucu hatası" });
-    }
+    const chapter = await ChapterService.getChapterById(req.params.id);
+    if (!chapter) throw notFound("Bölüm bulunamadı");
+    res.status(200).json({ chapter });
   }
 
   static async createChapter(req, res) {
-    try {
-      const chapterData = req.body;
-      const newChapter = await ChapterService.createChapter(chapterData);
-      res
-        .status(201)
-        .json({ message: "Bölüm oluşturuldu", chapter: newChapter });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: "Sunucu hatası" });
-    }
+    const chapter = await ChapterService.createChapter(pick(req.body, ChapterService.FIELDS));
+    res.status(201).json({ message: "Bölüm oluşturuldu", chapter });
   }
 
   static async updateChapter(req, res) {
-    try {
-      const { id } = req.params;
-      const chapterData = req.body;
-      const updatedChapter = await ChapterService.updateChapter(
-        id,
-        chapterData
-      );
-      res
-        .status(200)
-        .json({ message: "Bölüm güncellendi", chapter: updatedChapter });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: "Sunucu hatası" });
-    }
+    const chapter = await ChapterService.updateChapter(
+      req.params.id,
+      pick(req.body, ChapterService.FIELDS)
+    );
+    res.status(200).json({ message: "Bölüm güncellendi", chapter });
   }
 
   static async deleteChapter(req, res) {
-    try {
-      const { id } = req.params;
-      await ChapterService.deleteChapter(id);
-      res.status(200).json({ message: "Bölüm silindi" });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: "Sunucu hatası" });
-    }
+    await ChapterService.deleteChapter(req.params.id);
+    res.status(200).json({ message: "Bölüm silindi" });
   }
 
-  // Business logic endpoints
+  // Business logic endpoints. The user always comes from the session; the
+  // old handlers trusted a userId sent in the request body.
   static async completeChapter(req, res) {
-    try {
-      const { id } = req.params;
-      const { userId } = req.body;
-      const result = await ChapterService.completeChapter(id, userId);
-      res.status(200).json({
-        message: "Bölüm tamamlandı",
-        completion: result,
-      });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: "Sunucu hatası" });
-    }
+    const completion = await ChapterService.completeChapter(req.params.id, req.user.userId);
+    res.status(200).json({ message: "Bölüm tamamlandı", completion });
   }
 
   static async getWriteUps(req, res) {
-    try {
-      const { id } = req.params;
-      const writeUps = await ChapterService.getWriteUps(id);
-      res.status(200).json({ writeUps });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: "Sunucu hatası" });
-    }
+    const writeUps = await ChapterService.getWriteUps(req.params.id);
+    res.status(200).json({ writeUps });
   }
 
   static async getInstructions(req, res) {
-    try {
-      const { id } = req.params;
-      const instructions = await ChapterService.getInstructions(id);
-      res.status(200).json({ instructions });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: "Sunucu hatası" });
-    }
+    const instructions = await ChapterService.getInstructions(req.params.id);
+    res.status(200).json({ instructions });
   }
 
   static async findInstruction(req, res) {
-    try {
-      const { id, instructionId } = req.params;
-      const instruction = await ChapterService.findInstruction(
-        id,
-        instructionId
-      );
-      if (!instruction) {
-        return res.status(404).json({ error: "Yönerge bulunamadı" });
-      }
-      res.status(200).json({ instruction });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: "Sunucu hatası" });
-    }
+    const instruction = await ChapterService.findInstruction(req.params.id, req.params.instructionId);
+    if (!instruction) throw notFound("Yönerge bulunamadı");
+    res.status(200).json({ instruction });
   }
 
   static async startSandbox(req, res) {
-    try {
-      const { id } = req.params;
-      const result = await ChapterService.startSandbox(id);
-      res.status(200).json({
-        message: "Sandbox başlatıldı",
-        sandbox: result,
-      });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: error.message });
-    }
+    const sandbox = await ChapterService.startSandbox(req.params.id, req.user.userId);
+    res.status(200).json({ message: "Sandbox başlatıldı", sandbox });
   }
 
   static async stopSandbox(req, res) {
-    try {
-      const { id } = req.params;
-      const result = await ChapterService.stopSandbox(id);
-      res.status(200).json({
-        message: "Sandbox durduruldu",
-        sandbox: result,
-      });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: error.message });
-    }
+    const sandbox = await ChapterService.stopSandbox(req.params.id, req.user.userId);
+    res.status(200).json({ message: "Sandbox durduruldu", sandbox });
   }
 }
 
-module.exports = ChapterController;
+module.exports = wrapController(ChapterController);

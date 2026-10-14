@@ -2,8 +2,6 @@ const bcrypt = require("bcrypt");
 
 const BaseModel = require("./BaseModel");
 
-const BCRYPT_HASH = /^\$2[aby]\$\d{2}\$/;
-
 class User extends BaseModel {
   static get tableName() {
     return "users";
@@ -115,17 +113,18 @@ class User extends BaseModel {
   }
 
   // Password changes through patch/update must be hashed too; previously they
-  // were stored in plain text and the user could no longer log in.
+  // were stored in plain text and the user could no longer log in. Updates
+  // only ever receive a new plain-text password, never the stored hash.
   async $beforeUpdate(opt, context) {
     await super.$beforeUpdate(opt, context);
-    if (this.password && !BCRYPT_HASH.test(this.password)) {
+    if (this.password !== undefined) {
       this.password = await bcrypt.hash(this.password, 10);
     }
   }
 
   // Verify password
   async verifyPassword(password) {
-    if (!password || !this.password) return false;
+    if (typeof password !== "string" || !password || !this.password) return false;
     return await bcrypt.compare(password, this.password);
   }
 

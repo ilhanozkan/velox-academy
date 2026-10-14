@@ -1,6 +1,6 @@
 const express = require("express");
 const CategoryController = require("../controllers/categoryController");
-const authMiddleware = require("../utils/authMiddleware");
+const { requireAdmin } = require("../middleware/auth");
 const router = express.Router();
 
 // Tüm kategorileri getir
@@ -10,13 +10,13 @@ router.get("/", CategoryController.getAllCategories);
 router.get("/:id", CategoryController.getCategoryById);
 
 // Yeni kategori oluştur
-router.post("/", authMiddleware, CategoryController.createCategory);
+router.post("/", requireAdmin, CategoryController.createCategory);
 
 // Kategoriyi güncelle
-router.put("/:id", authMiddleware, CategoryController.updateCategory);
+router.put("/:id", requireAdmin, CategoryController.updateCategory);
 
 // Kategoriyi sil
-router.delete("/:id", authMiddleware, CategoryController.deleteCategory);
+router.delete("/:id", requireAdmin, CategoryController.deleteCategory);
 
 // Business logic routes
 // Kategoriye ait eğitimleri getir

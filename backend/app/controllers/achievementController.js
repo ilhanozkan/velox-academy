@@ -1,75 +1,35 @@
 const AchievementService = require("../services/achievementService");
+const { notFound, pick, wrapController } = require("../utils/httpError");
 
 class AchievementController {
   static async getAllAchievements(req, res) {
-    try {
-      const achievements = await AchievementService.getAllAchievements();
-      res.status(200).json({ achievements });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: "Sunucu hatası" });
-    }
+    const achievements = await AchievementService.getAllAchievements();
+    res.status(200).json({ achievements });
   }
 
   static async getAchievementById(req, res) {
-    try {
-      const { id } = req.params;
-      const achievement = await AchievementService.getAchievementById(id);
-      if (!achievement) {
-        return res.status(404).json({ error: "Başarı bulunamadı" });
-      }
-      res.status(200).json({ achievement });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: "Sunucu hatası" });
-    }
+    const achievement = await AchievementService.getAchievementById(req.params.id);
+    if (!achievement) throw notFound("Başarı bulunamadı");
+    res.status(200).json({ achievement });
   }
 
   static async createAchievement(req, res) {
-    try {
-      const achievementData = req.body;
-      const newAchievement = await AchievementService.createAchievement(
-        achievementData
-      );
-      res
-        .status(201)
-        .json({ message: "Başarı oluşturuldu", achievement: newAchievement });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: "Sunucu hatası" });
-    }
+    const achievement = await AchievementService.createAchievement(pick(req.body, AchievementService.FIELDS));
+    res.status(201).json({ message: "Başarı oluşturuldu", achievement });
   }
 
   static async updateAchievement(req, res) {
-    try {
-      const { id } = req.params;
-      const achievementData = req.body;
-      const updatedAchievement = await AchievementService.updateAchievement(
-        id,
-        achievementData
-      );
-      res
-        .status(200)
-        .json({
-          message: "Başarı güncellendi",
-          achievement: updatedAchievement,
-        });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: "Sunucu hatası" });
-    }
+    const achievement = await AchievementService.updateAchievement(
+      req.params.id,
+      pick(req.body, AchievementService.FIELDS)
+    );
+    res.status(200).json({ message: "Başarı güncellendi", achievement });
   }
 
   static async deleteAchievement(req, res) {
-    try {
-      const { id } = req.params;
-      await AchievementService.deleteAchievement(id);
-      res.status(200).json({ message: "Başarı silindi" });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: "Sunucu hatası" });
-    }
+    await AchievementService.deleteAchievement(req.params.id);
+    res.status(200).json({ message: "Başarı silindi" });
   }
 }
 
-module.exports = AchievementController;
+module.exports = wrapController(AchievementController);
